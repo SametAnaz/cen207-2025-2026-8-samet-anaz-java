@@ -556,4 +556,145 @@ public class AuthManagerTest {
     String output = outContent.toString();
     assertTrue("Should handle special chars", output.contains("Invalid number"));
   }
+
+  // ==================== ADDITIONAL COVERAGE TESTS ====================
+
+  /**
+   * Tests changeMasterPassword with plaintext password comparison.
+   */
+  @Test
+  public void testChangeMasterPasswordPlaintextComparison() {
+    String password = "plaintextTest";
+    String newPassword = "newPlaintext";
+    // Set up and login to get plaintext stored
+    Scanner setupScanner = new Scanner(password + "\n");
+    auth.createMasterPassword(setupScanner);
+    setupScanner.close();
+    Scanner loginScanner = new Scanner(password + "\n");
+    auth.login(loginScanner);
+    loginScanner.close();
+    outContent.reset();
+    // Now change - the current check should match plaintext
+    String changeInput = password + "\n" + newPassword + "\n" + newPassword + "\n";
+    Scanner changeScanner = new Scanner(changeInput);
+    boolean result = auth.changeMasterPassword(changeScanner);
+    changeScanner.close();
+    assertTrue("Should succeed with plaintext comparison", result);
+  }
+
+  /**
+   * Tests userMenu option 2 with plaintext password after login.
+   */
+  @Test
+  public void testUserMenuTestAuthWithPlaintextAfterLogin() {
+    String password = "testPlaintext";
+    Scanner setupScanner = new Scanner(password + "\n");
+    auth.createMasterPassword(setupScanner);
+    setupScanner.close();
+    // Login to store plaintext
+    Scanner loginScanner = new Scanner(password + "\n");
+    auth.login(loginScanner);
+    loginScanner.close();
+    outContent.reset();
+    // Test authentication - should match plaintext directly
+    String menuInput = "2\n" + password + "\n0\n";
+    Scanner scanner = new Scanner(menuInput);
+    auth.userMenu(scanner);
+    scanner.close();
+    String output = outContent.toString();
+    assertTrue("Should show authentication successful", output.contains("Authentication successful"));
+  }
+
+  /**
+   * Tests multiple consecutive menu operations.
+   */
+  @Test
+  public void testUserMenuConsecutiveOperations() {
+    String password = "testPassword";
+    Scanner setupScanner = new Scanner(password + "\n");
+    auth.createMasterPassword(setupScanner);
+    setupScanner.close();
+    Scanner loginScanner = new Scanner(password + "\n");
+    auth.login(loginScanner);
+    loginScanner.close();
+    outContent.reset();
+    // Test auth twice, then exit
+    String menuInput = "2\n" + password + "\n2\n" + password + "\n0\n";
+    Scanner scanner = new Scanner(menuInput);
+    auth.userMenu(scanner);
+    scanner.close();
+    String output = outContent.toString();
+    // Should have multiple successes
+    int count = output.split("Authentication successful").length - 1;
+    assertTrue("Should show multiple auth successes", count >= 2);
+  }
+
+  /**
+   * Tests getMasterPassword returns null before setup.
+   */
+  @Test
+  public void testGetMasterPasswordBeforeSetup() {
+    // Fresh instance without password
+    File file = new File("master-password.txt");
+
+    if (file.exists()) {
+      file.delete();
+    }
+
+    AuthManager.resetInstance();
+    AuthManager freshAuth = AuthManager.getInstance();
+    String masterPwd = freshAuth.getMasterPassword();
+    assertNull("Should be null before setup", masterPwd);
+  }
+
+  /**
+   * Tests large choice number in menu.
+   */
+  @Test
+  public void testUserMenuLargeChoiceNumber() {
+    String password = "testPassword";
+    Scanner setupScanner = new Scanner(password + "\n");
+    auth.createMasterPassword(setupScanner);
+    setupScanner.close();
+    outContent.reset();
+    Scanner scanner = new Scanner("999999\n0\n");
+    auth.userMenu(scanner);
+    scanner.close();
+    String output = outContent.toString();
+    assertTrue("Should show invalid choice", output.contains("Invalid choice"));
+  }
+
+  /**
+   * Tests floating point input in menu.
+   */
+  @Test
+  public void testUserMenuFloatInput() {
+    String password = "testPassword";
+    Scanner setupScanner = new Scanner(password + "\n");
+    auth.createMasterPassword(setupScanner);
+    setupScanner.close();
+    outContent.reset();
+    Scanner scanner = new Scanner("1.5\n0\n");
+    auth.userMenu(scanner);
+    scanner.close();
+    String output = outContent.toString();
+    assertTrue("Should show invalid number", output.contains("Invalid number"));
+  }
+
+  /**
+   * Tests whitespace-only input in menu.
+   */
+  @Test
+  public void testUserMenuWhitespaceInput() {
+    String password = "testPassword";
+    Scanner setupScanner = new Scanner(password + "\n");
+    auth.createMasterPassword(setupScanner);
+    setupScanner.close();
+    outContent.reset();
+    Scanner scanner = new Scanner("   \n0\n");
+    auth.userMenu(scanner);
+    scanner.close();
+    String output = outContent.toString();
+    assertTrue("Should show invalid number", output.contains("Invalid number"));
+  }
 }

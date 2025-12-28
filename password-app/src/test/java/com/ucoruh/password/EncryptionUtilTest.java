@@ -334,4 +334,164 @@ public class EncryptionUtilTest {
     assertTrue("Encrypted output should be Base64",
                encrypted.matches("^[A-Za-z0-9+/=]+$"));
   }
+
+  // ==================== ADDITIONAL LINE COVERAGE TESTS ====================
+
+  /**
+   * @brief Tests multiple encrypt/decrypt cycles.
+   */
+  @Test
+  public void testMultipleEncryptDecryptCycles() throws Exception {
+    String data = "cycle-test-data";
+    String password = "cycle-password";
+
+    for (int i = 0; i < 10; i++) {
+      String encrypted = EncryptionUtil.encrypt(data, password);
+      String decrypted = EncryptionUtil.decrypt(encrypted, password);
+      assertEquals("Cycle " + i + " should decrypt correctly", data, decrypted);
+    }
+  }
+
+  /**
+   * @brief Tests hash with single character inputs.
+   */
+  @Test
+  public void testHashSingleCharacters() {
+    for (char c = 'a'; c <= 'z'; c++) {
+      String hash = EncryptionUtil.hashString(String.valueOf(c));
+      assertNotNull(hash);
+      assertEquals(64, hash.length());
+    }
+  }
+
+  /**
+   * @brief Tests encrypt with very short master password.
+   */
+  @Test
+  public void testEncryptShortMasterPassword() throws Exception {
+    String data = "test-data";
+    String shortPassword = "a";
+
+    String encrypted = EncryptionUtil.encrypt(data, shortPassword);
+    String decrypted = EncryptionUtil.decrypt(encrypted, shortPassword);
+
+    assertEquals(data, decrypted);
+  }
+
+  /**
+   * @brief Tests encrypt with very long master password.
+   */
+  @Test
+  public void testEncryptLongMasterPassword() throws Exception {
+    String data = "test-data";
+    StringBuilder sb = new StringBuilder();
+
+    for (int i = 0; i < 1000; i++) {
+      sb.append("longpassword");
+    }
+
+    String longPassword = sb.toString();
+
+    String encrypted = EncryptionUtil.encrypt(data, longPassword);
+    String decrypted = EncryptionUtil.decrypt(encrypted, longPassword);
+
+    assertEquals(data, decrypted);
+  }
+
+  /**
+   * @brief Tests hash produces deterministic output.
+   */
+  @Test
+  public void testHashDeterministic() {
+    String input = "deterministic-test";
+    String hash1 = EncryptionUtil.hashString(input);
+    String hash2 = EncryptionUtil.hashString(input);
+    String hash3 = EncryptionUtil.hashString(input);
+    assertEquals(hash1, hash2);
+    assertEquals(hash2, hash3);
+  }
+
+  /**
+   * @brief Tests encryption produces different output for different data.
+   */
+  @Test
+  public void testEncryptDifferentData() throws Exception {
+    String password = "test-password";
+
+    String encrypted1 = EncryptionUtil.encrypt("data1", password);
+    String encrypted2 = EncryptionUtil.encrypt("data2", password);
+
+    assertNotEquals(encrypted1, encrypted2);
+  }
+
+  /**
+   * @brief Tests hash with bytes that produce single hex digit.
+   */
+  @Test
+  public void testHashWithLeadingZeros() {
+    // These inputs are chosen to produce hash bytes < 16 (need leading zero)
+    String[] inputs = {"zero", "hex", "pad", "test123", "abc123xyz"};
+
+    for (String input : inputs) {
+      String hash = EncryptionUtil.hashString(input);
+      assertEquals("Hash should be exactly 64 chars", 64, hash.length());
+      // All characters should be hex
+      assertTrue(hash.matches("[0-9a-f]+"));
+    }
+  }
+
+  /**
+   * @brief Tests encryption with binary-like data string.
+   */
+  @Test
+  public void testEncryptBinaryLikeData() throws Exception {
+    String binaryData = "\u0000\u0001\u0002\u0003";
+    String password = "binary-password";
+
+    String encrypted = EncryptionUtil.encrypt(binaryData, password);
+    String decrypted = EncryptionUtil.decrypt(encrypted, password);
+
+    assertEquals(binaryData, decrypted);
+  }
+
+  /**
+   * @brief Tests hash of binary-like input.
+   */
+  @Test
+  public void testHashBinaryInput() {
+    String binaryInput = "\u0000\u0001\u0002";
+    String hash = EncryptionUtil.hashString(binaryInput);
+    assertNotNull(hash);
+    assertEquals(64, hash.length());
+  }
+
+  /**
+   * @brief Tests encryption result is not the same as input.
+   */
+  @Test
+  public void testEncryptionChangesData() throws Exception {
+    String data = "sensitive-data";
+    String password = "secret";
+
+    String encrypted = EncryptionUtil.encrypt(data, password);
+
+    assertNotEquals("Encrypted should differ from original", data, encrypted);
+    assertFalse("Original should not be substring of encrypted", encrypted.contains(data));
+  }
+
+  /**
+   * @brief Tests multiple different passwords on same data.
+   */
+  @Test
+  public void testMultiplePasswordsOnSameData() throws Exception {
+    String data = "same-data";
+
+    String enc1 = EncryptionUtil.encrypt(data, "password1");
+    String enc2 = EncryptionUtil.encrypt(data, "password2");
+    String enc3 = EncryptionUtil.encrypt(data, "password3");
+
+    assertNotEquals(enc1, enc2);
+    assertNotEquals(enc2, enc3);
+    assertNotEquals(enc1, enc3);
+  }
 }

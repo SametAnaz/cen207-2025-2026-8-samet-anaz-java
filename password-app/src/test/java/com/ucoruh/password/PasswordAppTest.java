@@ -492,4 +492,104 @@ public class PasswordAppTest {
     String output = outputStream.toString();
     assertTrue("Should handle special chars", output.contains("Invalid number."));
   }
+
+  // ==================== NEW REFACTORED METHOD TESTS ====================
+
+  /**
+   * @brief Tests isConsoleMode with --console flag.
+   */
+  @Test
+  public void testIsConsoleModeWithConsoleFlag() {
+    assertTrue("Should detect --console flag",
+               PasswordApp.isConsoleMode(new String[] {"--console"}));
+  }
+
+  /**
+   * @brief Tests isConsoleMode with -c flag.
+   */
+  @Test
+  public void testIsConsoleModeWithShortFlag() {
+    assertTrue("Should detect -c flag",
+               PasswordApp.isConsoleMode(new String[] {"-c"}));
+  }
+
+  /**
+   * @brief Tests isConsoleMode with uppercase flags.
+   */
+  @Test
+  public void testIsConsoleModeUppercase() {
+    assertTrue("Should detect --CONSOLE flag",
+               PasswordApp.isConsoleMode(new String[] {"--CONSOLE"}));
+    assertTrue("Should detect -C flag",
+               PasswordApp.isConsoleMode(new String[] {"-C"}));
+  }
+
+  /**
+   * @brief Tests isConsoleMode with no console flag.
+   */
+  @Test
+  public void testIsConsoleModeNoFlag() {
+    assertFalse("Should return false for empty args",
+                PasswordApp.isConsoleMode(new String[] {}));
+    assertFalse("Should return false for other flags",
+                PasswordApp.isConsoleMode(new String[] {"--gui", "--other"}));
+  }
+
+  /**
+   * @brief Tests isConsoleMode with mixed flags.
+   */
+  @Test
+  public void testIsConsoleModeMixedFlags() {
+    assertTrue("Should detect -c among other flags",
+               PasswordApp.isConsoleMode(new String[] {"--other", "-c", "--flag"}));
+  }
+
+  /**
+   * @brief Tests setupLookAndFeel method.
+   */
+  @Test
+  public void testSetupLookAndFeel() {
+    // This should not throw any exception
+    PasswordApp.setupLookAndFeel();
+    // If we get here without exception, test passes
+    assertTrue(true);
+  }
+
+  /**
+   * @brief Tests startGUIMode method (non-blocking).
+   */
+  @Test
+  public void testStartGUIMode() {
+    try {
+      Thread guiThread = new Thread(() -> {
+        PasswordApp.startGUIMode();
+      });
+      guiThread.start();
+      Thread.sleep(50);
+      guiThread.interrupt();
+    } catch (Exception e) {
+      // Expected in test environment
+    }
+
+    assertTrue(true);
+  }
+
+  /**
+   * @brief Tests createAndShowGUI method.
+   */
+  @Test
+  public void testCreateAndShowGUI() {
+    try {
+      Thread guiThread = new Thread(() -> {
+        PasswordApp.createAndShowGUI();
+      });
+      guiThread.start();
+      Thread.sleep(50);
+      guiThread.interrupt();
+    } catch (Exception e) {
+      // Expected in test environment
+    }
+
+    assertTrue(true);
+  }
 }

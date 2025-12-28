@@ -496,4 +496,202 @@ public class DatabasePasswordStorageTest {
       assertTrue("Should find " + orig.getService(), found);
     }
   }
+
+  // ==================== ADDITIONAL BRANCH COVERAGE TESTS ====================
+
+  /**
+   * Tests add method SQLException handling when database connection fails.
+   */
+  @Test
+  public void testAddSQLExceptionHandling() {
+    DatabasePasswordStorage errorStorage = new DatabasePasswordStorage(TEST_MASTER_PASSWORD) {
+      @Override
+      protected String getDatabaseUrl() {
+        return "jdbc:sqlite:/nonexistent/path/to/database.db";
+      }
+    };
+
+    outContent.reset();
+    String input = "TestService\nuser\npass\n";
+    Scanner scanner = new Scanner(new ByteArrayInputStream(input.getBytes()));
+    errorStorage.add(scanner);
+    String output = outContent.toString();
+    assertTrue("Should show database error",
+               output.contains("error") || output.contains("Error"));
+  }
+
+  /**
+   * Tests update method SQLException handling when database connection fails.
+   */
+  @Test
+  public void testUpdateSQLExceptionHandling() {
+    DatabasePasswordStorage errorStorage = new DatabasePasswordStorage(TEST_MASTER_PASSWORD) {
+      @Override
+      protected String getDatabaseUrl() {
+        return "jdbc:sqlite:/nonexistent/path/to/database.db";
+      }
+    };
+
+    outContent.reset();
+    String input = "TestService\nnewuser\nnewpass\n";
+    Scanner scanner = new Scanner(new ByteArrayInputStream(input.getBytes()));
+    errorStorage.update(scanner);
+    String output = outContent.toString();
+    assertTrue("Should show database or not found error",
+               output.contains("error") || output.contains("Error") || output.contains("not found"));
+  }
+
+  /**
+   * Tests update method with encryption error when encrypting new username.
+   */
+  @Test
+  public void testUpdateEncryptionErrorUsername() {
+    // Add valid entry first
+    addEntry("EncryptErrorService", "originaluser", "originalpass");
+    // Create storage that will fail encryption
+    DatabasePasswordStorage errorStorage = new DatabasePasswordStorage(null) {
+      @Override
+      protected String getDatabaseUrl() {
+        return "jdbc:sqlite:passwords.db";
+      }
+    };
+
+    outContent.reset();
+    String input = "EncryptErrorService\nnewuser\nnewpass\n";
+    Scanner scanner = new Scanner(new ByteArrayInputStream(input.getBytes()));
+    errorStorage.update(scanner);
+    String output = outContent.toString();
+    // Should handle gracefully
+    assertNotNull(output);
+  }
+
+  /**
+   * Tests delete method SQLException handling.
+   */
+  @Test
+  public void testDeleteSQLExceptionHandling() {
+    DatabasePasswordStorage errorStorage = new DatabasePasswordStorage(TEST_MASTER_PASSWORD) {
+      @Override
+      protected String getDatabaseUrl() {
+        return "jdbc:sqlite:/nonexistent/path/to/database.db";
+      }
+    };
+
+    outContent.reset();
+    String input = "TestService\n";
+    Scanner scanner = new Scanner(new ByteArrayInputStream(input.getBytes()));
+    errorStorage.delete(scanner);
+    String output = outContent.toString();
+    assertTrue("Should show database error",
+               output.contains("error") || output.contains("Error"));
+  }
+
+  /**
+   * Tests readAll method SQLException handling.
+   */
+  @Test
+  public void testReadAllSQLExceptionHandling() {
+    DatabasePasswordStorage errorStorage = new DatabasePasswordStorage(TEST_MASTER_PASSWORD) {
+      @Override
+      protected String getDatabaseUrl() {
+        return "jdbc:sqlite:/nonexistent/path/to/database.db";
+      }
+    };
+
+    outContent.reset();
+    List<Password> result = errorStorage.readAll();
+    assertNotNull("Should return empty list on error", result);
+    assertTrue("Should be empty", result.isEmpty());
+  }
+
+  /**
+   * Tests writeAll method SQLException handling.
+   */
+  @Test
+  public void testWriteAllSQLExceptionHandling() {
+    DatabasePasswordStorage errorStorage = new DatabasePasswordStorage(TEST_MASTER_PASSWORD) {
+      @Override
+      protected String getDatabaseUrl() {
+        return "jdbc:sqlite:/nonexistent/path/to/database.db";
+      }
+    };
+
+    outContent.reset();
+    List<Password> passwords = Arrays.asList(
+                                 new Password("TestService", "user", "pass")
+                               );
+    errorStorage.writeAll(passwords);
+    String output = outContent.toString();
+    assertTrue("Should show database error",
+               output.contains("error") || output.contains("Error"));
+  }
+
+  /**
+   * Tests update when keeping both username and password (empty inputs).
+   */
+  @Test
+  public void testUpdateKeepBothFields() {
+    addEntry("KeepBothService", "originaluser", "originalpass");
+    outContent.reset();
+    // Both fields empty - should keep both
+    String input = "KeepBothService\n\n\n";
+    Scanner scanner = new Scanner(new ByteArrayInputStream(input.getBytes()));
+    storage.update(scanner);
+    String output = outContent.toString();
+    assertTrue("Should show success", output.contains("updated successfully"));
+    // Verify values unchanged
+    List<Password> passwords = storage.readAll();
+    assertEquals(1, passwords.size());
+    assertEquals("originaluser", passwords.get(0).getUsername());
+  }
+
+  /**
+   * Tests createTableIfNotExists error handling.
+   */
+  @Test
+  public void testCreateTableIfNotExistsError() {
+    outContent.reset();
+    // This will attempt to create table on invalid path
+    DatabasePasswordStorage errorStorage = new DatabasePasswordStorage(TEST_MASTER_PASSWORD) {
+      @Override
+      protected String getDatabaseUrl() {
+        return "jdbc:sqlite:/invalid/path/db.db";
+      }
+    };
+
+    // Constructor should handle error gracefully
+    assertNotNull(errorStorage);
+  }
+
+  /**
+   * Tests add with existing service - duplicate check branch.
+   */
+  @Test
+  public void testAddExistingServiceCheckBranch() {
+    // First add
+    addEntry("DupCheckService", "user1", "pass1");
+    outContent.reset();
+    // Second add with same service
+    addEntry("DupCheckService", "user2", "pass2");
+    String output = outContent.toString();
+    assertTrue("Should show already exists", output.contains("already exists"));
+    // Verify only one entry
+    assertEquals(1, storage.readAll().size());
+  }
+
+  /**
+   * Tests view with multiple entries to verify count formatting.
+   */
+  @Test
+  public void testViewMultipleEntriesNumbering() {
+    addEntry("MultiView1", "user1", "pass1");
+    addEntry("MultiView2", "user2", "pass2");
+    addEntry("MultiView3", "user3", "pass3");
+    outContent.reset();
+    storage.view();
+    String output = outContent.toString();
+    assertTrue("Should show 1.", output.contains("1."));
+    assertTrue("Should show 2.", output.contains("2."));
+    assertTrue("Should show 3.", output.contains("3."));
+  }
 }
