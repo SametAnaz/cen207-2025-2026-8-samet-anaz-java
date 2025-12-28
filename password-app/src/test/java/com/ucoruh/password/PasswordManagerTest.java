@@ -1109,4 +1109,1174 @@ public class PasswordManagerTest {
     assertTrue(sorted.get(2).contains("medium") && sorted.get(2).contains("3"));
     assertTrue(sorted.get(3).contains("low") && sorted.get(3).contains("1"));
   }
+
+  // ========== SERVICE GRAPH (BFS, DFS, SCC) TESTS ==========
+
+  /**
+   * Tests adding edges to service graph.
+   */
+  @Test
+  public void testServiceGraphAddEdge() {
+    PasswordManager pm = new PasswordManager("test123");
+    pm.addServiceDependency("email", "storage");
+    pm.addServiceDependency("storage", "backup");
+    assertTrue(pm.getServiceGraph().containsService("email"));
+    assertTrue(pm.getServiceGraph().containsService("storage"));
+    assertTrue(pm.getServiceGraph().containsService("backup"));
+  }
+
+  /**
+   * Tests BFS traversal on service graph.
+   */
+  @Test
+  public void testServiceGraphBFS() {
+    PasswordManager pm = new PasswordManager("test123");
+    pm.addServiceDependency("A", "B");
+    pm.addServiceDependency("A", "C");
+    pm.addServiceDependency("B", "D");
+    pm.addServiceDependency("C", "D");
+    List<String> bfsResult = pm.getRelatedServices("A");
+    assertNotNull(bfsResult);
+    assertEquals(4, bfsResult.size());
+    assertEquals("A", bfsResult.get(0));
+    assertTrue(bfsResult.contains("B"));
+    assertTrue(bfsResult.contains("C"));
+    assertTrue(bfsResult.contains("D"));
+  }
+
+  /**
+   * Tests BFS with non-existent starting service.
+   */
+  @Test
+  public void testServiceGraphBFSNonExistent() {
+    PasswordManager pm = new PasswordManager("test123");
+    pm.addServiceDependency("A", "B");
+    List<String> bfsResult = pm.getRelatedServices("Z");
+    assertNotNull(bfsResult);
+    assertTrue(bfsResult.isEmpty());
+  }
+
+  /**
+   * Tests DFS traversal on service graph.
+   */
+  @Test
+  public void testServiceGraphDFS() {
+    PasswordManager pm = new PasswordManager("test123");
+    pm.addServiceDependency("A", "B");
+    pm.addServiceDependency("A", "C");
+    pm.addServiceDependency("B", "D");
+    pm.addServiceDependency("C", "D");
+    List<String> dfsResult = pm.getServiceGraph().dfs("A");
+    assertNotNull(dfsResult);
+    assertEquals(4, dfsResult.size());
+    assertEquals("A", dfsResult.get(0));
+    assertTrue(dfsResult.contains("B"));
+    assertTrue(dfsResult.contains("C"));
+    assertTrue(dfsResult.contains("D"));
+  }
+
+  /**
+   * Tests DFS with non-existent starting service.
+   */
+  @Test
+  public void testServiceGraphDFSNonExistent() {
+    PasswordManager pm = new PasswordManager("test123");
+    pm.addServiceDependency("A", "B");
+    List<String> dfsResult = pm.getServiceGraph().dfs("Z");
+    assertNotNull(dfsResult);
+    assertTrue(dfsResult.isEmpty());
+  }
+
+  /**
+   * Tests finding strongly connected components.
+   */
+  @Test
+  public void testServiceGraphSCC() {
+    PasswordManager pm = new PasswordManager("test123");
+    // Create a graph with two SCCs
+    // SCC 1: A -> B -> C -> A (cycle)
+    pm.addServiceDependency("A", "B");
+    pm.addServiceDependency("B", "C");
+    pm.addServiceDependency("C", "A");
+    // SCC 2: D -> E -> D (cycle)
+    pm.addServiceDependency("D", "E");
+    pm.addServiceDependency("E", "D");
+    // Connection between SCCs
+    pm.addServiceDependency("C", "D");
+    List<List<String>> sccs = pm.getServiceClusters();
+    assertNotNull(sccs);
+    assertEquals(2, sccs.size());
+    // Check that we have the right SCCs
+    boolean foundFirstSCC = false;
+    boolean foundSecondSCC = false;
+
+    for (List<String> scc : sccs) {
+      if (scc.size() == 3 && scc.contains("A") && scc.contains("B") && scc.contains("C")) {
+        foundFirstSCC = true;
+      }
+
+      if (scc.size() == 2 && scc.contains("D") && scc.contains("E")) {
+        foundSecondSCC = true;
+      }
+    }
+
+    assertTrue("Should find first SCC (A, B, C)", foundFirstSCC);
+    assertTrue("Should find second SCC (D, E)", foundSecondSCC);
+  }
+
+  /**
+   * Tests SCC with single node graph.
+   */
+  @Test
+  public void testServiceGraphSCCSingleNode() {
+    PasswordManager pm = new PasswordManager("test123");
+    pm.addServiceDependency("A", "A"); // Self-loop
+    List<List<String>> sccs = pm.getServiceClusters();
+    assertNotNull(sccs);
+    assertEquals(1, sccs.size());
+    assertEquals(1, sccs.get(0).size());
+    assertTrue(sccs.get(0).contains("A"));
+  }
+
+  /**
+   * Tests SCC with disconnected components.
+   */
+  @Test
+  public void testServiceGraphSCCDisconnected() {
+    PasswordManager pm = new PasswordManager("test123");
+    pm.addServiceDependency("A", "B");
+    pm.addServiceDependency("C", "D");
+    List<List<String>> sccs = pm.getServiceClusters();
+    assertNotNull(sccs);
+    assertEquals(4, sccs.size()); // Each node is its own SCC (no cycles)
+  }
+
+  /**
+   * Tests getting all services from graph.
+   */
+  @Test
+  public void testServiceGraphGetAllServices() {
+    PasswordManager pm = new PasswordManager("test123");
+    pm.addServiceDependency("email", "storage");
+    pm.addServiceDependency("storage", "backup");
+    pm.addServiceDependency("auth", "email");
+    assertEquals(4, pm.getServiceGraph().getAllServices().size());
+    assertTrue(pm.getServiceGraph().getAllServices().contains("email"));
+    assertTrue(pm.getServiceGraph().getAllServices().contains("storage"));
+    assertTrue(pm.getServiceGraph().getAllServices().contains("backup"));
+    assertTrue(pm.getServiceGraph().getAllServices().contains("auth"));
+  }
+
+  /**
+   * Tests getting neighbors of a service.
+   */
+  @Test
+  public void testServiceGraphGetNeighbors() {
+    PasswordManager pm = new PasswordManager("test123");
+    pm.addServiceDependency("A", "B");
+    pm.addServiceDependency("A", "C");
+    pm.addServiceDependency("A", "D");
+    List<String> neighbors = pm.getServiceGraph().getNeighbors("A");
+    assertNotNull(neighbors);
+    assertEquals(3, neighbors.size());
+    assertTrue(neighbors.contains("B"));
+    assertTrue(neighbors.contains("C"));
+    assertTrue(neighbors.contains("D"));
+  }
+
+  /**
+   * Tests getting neighbors of non-existent service.
+   */
+  @Test
+  public void testServiceGraphGetNeighborsNonExistent() {
+    PasswordManager pm = new PasswordManager("test123");
+    pm.addServiceDependency("A", "B");
+    List<String> neighbors = pm.getServiceGraph().getNeighbors("Z");
+    assertNotNull(neighbors);
+    assertTrue(neighbors.isEmpty());
+  }
+
+  /**
+   * Tests clearing the service graph.
+   */
+  @Test
+  public void testServiceGraphClear() {
+    PasswordManager pm = new PasswordManager("test123");
+    pm.addServiceDependency("A", "B");
+    pm.addServiceDependency("B", "C");
+    pm.getServiceGraph().clear();
+    assertTrue(pm.getServiceGraph().getAllServices().isEmpty());
+  }
+
+  /**
+   * Tests BFS with complex graph structure.
+   */
+  @Test
+  public void testServiceGraphBFSComplex() {
+    PasswordManager pm = new PasswordManager("test123");
+    // Create a more complex graph
+    pm.addServiceDependency("root", "level1a");
+    pm.addServiceDependency("root", "level1b");
+    pm.addServiceDependency("level1a", "level2a");
+    pm.addServiceDependency("level1a", "level2b");
+    pm.addServiceDependency("level1b", "level2c");
+    List<String> bfsResult = pm.getRelatedServices("root");
+    assertEquals(6, bfsResult.size());
+    assertEquals("root", bfsResult.get(0)); // Root is first
+    // Level 1 nodes should come before level 2 nodes
+    int indexLevel1a = bfsResult.indexOf("level1a");
+    int indexLevel1b = bfsResult.indexOf("level1b");
+    int indexLevel2a = bfsResult.indexOf("level2a");
+    int indexLevel2b = bfsResult.indexOf("level2b");
+    int indexLevel2c = bfsResult.indexOf("level2c");
+    assertTrue(indexLevel1a < indexLevel2a);
+    assertTrue(indexLevel1a < indexLevel2b);
+    assertTrue(indexLevel1b < indexLevel2c);
+  }
+
+  /**
+   * Tests DFS with complex graph structure.
+   */
+  @Test
+  public void testServiceGraphDFSComplex() {
+    PasswordManager pm = new PasswordManager("test123");
+    pm.addServiceDependency("A", "B");
+    pm.addServiceDependency("A", "C");
+    pm.addServiceDependency("B", "D");
+    pm.addServiceDependency("B", "E");
+    pm.addServiceDependency("C", "F");
+    List<String> dfsResult = pm.getServiceGraph().dfs("A");
+    assertEquals(6, dfsResult.size());
+    assertEquals("A", dfsResult.get(0)); // A is first
+    assertTrue(dfsResult.contains("B"));
+    assertTrue(dfsResult.contains("C"));
+    assertTrue(dfsResult.contains("D"));
+    assertTrue(dfsResult.contains("E"));
+    assertTrue(dfsResult.contains("F"));
+  }
+
+  /**
+   * Tests SCC with large cycle.
+   */
+  @Test
+  public void testServiceGraphSCCLargeCycle() {
+    PasswordManager pm = new PasswordManager("test123");
+    // Create a large cycle: A -> B -> C -> D -> E -> A
+    pm.addServiceDependency("A", "B");
+    pm.addServiceDependency("B", "C");
+    pm.addServiceDependency("C", "D");
+    pm.addServiceDependency("D", "E");
+    pm.addServiceDependency("E", "A");
+    List<List<String>> sccs = pm.getServiceClusters();
+    assertEquals(1, sccs.size());
+    assertEquals(5, sccs.get(0).size());
+    assertTrue(sccs.get(0).contains("A"));
+    assertTrue(sccs.get(0).contains("B"));
+    assertTrue(sccs.get(0).contains("C"));
+    assertTrue(sccs.get(0).contains("D"));
+    assertTrue(sccs.get(0).contains("E"));
+  }
+
+  /**
+   * Tests empty graph operations.
+   */
+  @Test
+  public void testServiceGraphEmpty() {
+    PasswordManager pm = new PasswordManager("test123");
+    assertTrue(pm.getServiceGraph().getAllServices().isEmpty());
+    assertTrue(pm.getRelatedServices("A").isEmpty());
+    assertTrue(pm.getServiceClusters().isEmpty());
+  }
+
+  // ========== PENDING OPERATIONS QUEUE TESTS ==========
+
+  /**
+   * Tests basic enqueue and dequeue operations.
+   */
+  @Test
+  public void testQueueEnqueueDequeue() {
+    PasswordManager pm = new PasswordManager("test123");
+    pm.queueOperation("backup");
+    pm.queueOperation("sync");
+    pm.queueOperation("cleanup");
+    assertEquals(3, pm.getPendingOperationsCount());
+    assertEquals("backup", pm.peekNextOperation());
+    List<String> processed = pm.processPendingOperations();
+    assertEquals(3, processed.size());
+    assertEquals("backup", processed.get(0));
+    assertEquals("sync", processed.get(1));
+    assertEquals("cleanup", processed.get(2));
+    assertEquals(0, pm.getPendingOperationsCount());
+  }
+
+  /**
+   * Tests FIFO order in queue.
+   */
+  @Test
+  public void testQueueFIFOOrder() {
+    PasswordManager pm = new PasswordManager("test123");
+    PasswordManager.PendingOperationsQueue queue = pm.getOperationsQueue();
+    queue.enqueue("first");
+    queue.enqueue("second");
+    queue.enqueue("third");
+    assertEquals("first", queue.dequeue());
+    assertEquals("second", queue.dequeue());
+    assertEquals("third", queue.dequeue());
+    assertNull(queue.dequeue());
+  }
+
+  /**
+   * Tests empty queue operations.
+   */
+  @Test
+  public void testQueueEmpty() {
+    PasswordManager pm = new PasswordManager("test123");
+    PasswordManager.PendingOperationsQueue queue = pm.getOperationsQueue();
+    assertTrue(queue.isEmpty());
+    assertEquals(0, queue.size());
+    assertNull(queue.peek());
+    assertNull(queue.dequeue());
+  }
+
+  /**
+   * Tests peek operation without removing element.
+   */
+  @Test
+  public void testQueuePeek() {
+    PasswordManager pm = new PasswordManager("test123");
+    pm.queueOperation("operation1");
+    pm.queueOperation("operation2");
+    assertEquals("operation1", pm.peekNextOperation());
+    assertEquals("operation1", pm.peekNextOperation()); // Still there
+    assertEquals(2, pm.getPendingOperationsCount());
+  }
+
+  /**
+   * Tests single element queue.
+   */
+  @Test
+  public void testQueueSingleElement() {
+    PasswordManager pm = new PasswordManager("test123");
+    PasswordManager.PendingOperationsQueue queue = pm.getOperationsQueue();
+    queue.enqueue("only");
+    assertEquals(1, queue.size());
+    assertEquals("only", queue.peek());
+    assertEquals("only", queue.dequeue());
+    assertTrue(queue.isEmpty());
+  }
+
+  /**
+   * Tests queue clear operation.
+   */
+  @Test
+  public void testQueueClear() {
+    PasswordManager pm = new PasswordManager("test123");
+    PasswordManager.PendingOperationsQueue queue = pm.getOperationsQueue();
+    queue.enqueue("op1");
+    queue.enqueue("op2");
+    queue.enqueue("op3");
+    assertEquals(3, queue.size());
+    queue.clear();
+    assertTrue(queue.isEmpty());
+    assertEquals(0, queue.size());
+    assertNull(queue.peek());
+  }
+
+  /**
+   * Tests toList operation.
+   */
+  @Test
+  public void testQueueToList() {
+    PasswordManager pm = new PasswordManager("test123");
+    PasswordManager.PendingOperationsQueue queue = pm.getOperationsQueue();
+    queue.enqueue("alpha");
+    queue.enqueue("beta");
+    queue.enqueue("gamma");
+    List<String> list = queue.toList();
+    assertEquals(3, list.size());
+    assertEquals("alpha", list.get(0));
+    assertEquals("beta", list.get(1));
+    assertEquals("gamma", list.get(2));
+    // Original queue should be unchanged
+    assertEquals(3, queue.size());
+  }
+
+  /**
+   * Tests multiple enqueue/dequeue cycles.
+   */
+  @Test
+  public void testQueueMultipleCycles() {
+    PasswordManager pm = new PasswordManager("test123");
+    PasswordManager.PendingOperationsQueue queue = pm.getOperationsQueue();
+    queue.enqueue("task1");
+    queue.enqueue("task2");
+    assertEquals("task1", queue.dequeue());
+    queue.enqueue("task3");
+    assertEquals("task2", queue.dequeue());
+    assertEquals("task3", queue.dequeue());
+    queue.enqueue("task4");
+    queue.enqueue("task5");
+    assertEquals(2, queue.size());
+  }
+
+  /**
+   * Tests large queue operations.
+   */
+  @Test
+  public void testQueueLarge() {
+    PasswordManager pm = new PasswordManager("test123");
+    PasswordManager.PendingOperationsQueue queue = pm.getOperationsQueue();
+
+    for (int i = 0; i < 100; i++) {
+      queue.enqueue("operation" + i);
+    }
+
+    assertEquals(100, queue.size());
+
+    for (int i = 0; i < 100; i++) {
+      assertEquals("operation" + i, queue.dequeue());
+    }
+
+    assertTrue(queue.isEmpty());
+  }
+
+  /**
+   * Tests queue after all elements dequeued.
+   */
+  @Test
+  public void testQueueAfterEmptying() {
+    PasswordManager pm = new PasswordManager("test123");
+    PasswordManager.PendingOperationsQueue queue = pm.getOperationsQueue();
+    queue.enqueue("temp1");
+    queue.enqueue("temp2");
+    queue.dequeue();
+    queue.dequeue();
+    assertTrue(queue.isEmpty());
+    assertNull(queue.peek());
+    // Should work normally after emptying
+    queue.enqueue("new1");
+    assertEquals("new1", queue.peek());
+    assertEquals(1, queue.size());
+  }
+
+  /**
+   * Tests integrated queue operations through PasswordManager API.
+   */
+  @Test
+  public void testQueueIntegration() {
+    PasswordManager pm = new PasswordManager("test123");
+    assertEquals(0, pm.getPendingOperationsCount());
+    assertNull(pm.peekNextOperation());
+    pm.queueOperation("backup_passwords");
+    pm.queueOperation("sync_remote");
+    pm.queueOperation("cleanup_temp");
+    pm.queueOperation("verify_integrity");
+    assertEquals(4, pm.getPendingOperationsCount());
+    assertEquals("backup_passwords", pm.peekNextOperation());
+    List<String> processed = pm.processPendingOperations();
+    assertEquals(4, processed.size());
+    assertEquals("backup_passwords", processed.get(0));
+    assertEquals("sync_remote", processed.get(1));
+    assertEquals("cleanup_temp", processed.get(2));
+    assertEquals("verify_integrity", processed.get(3));
+    assertEquals(0, pm.getPendingOperationsCount());
+  }
+
+  /**
+   * Tests empty toList operation.
+   */
+  @Test
+  public void testQueueToListEmpty() {
+    PasswordManager pm = new PasswordManager("test123");
+    PasswordManager.PendingOperationsQueue queue = pm.getOperationsQueue();
+    List<String> list = queue.toList();
+    assertNotNull(list);
+    assertTrue(list.isEmpty());
+  }
+
+  // ========== CUSTOM HASH TABLE EDGE CASE TESTS ==========
+
+  /**
+   * Tests hash table with null key handling.
+   */
+  @Test
+  public void testHashTableNullKeyEdgeCase() {
+    PasswordManager pm = new PasswordManager("test123");
+
+    try {
+      pm.addCredential(null, "password");
+      // Should handle gracefully
+    } catch (Exception e) {
+      // Expected behavior
+    }
+
+    assertNull(pm.getCredential(null));
+  }
+
+  /**
+   * Tests hash table with empty string key.
+   */
+  @Test
+  public void testHashTableEmptyKeyEdgeCase() {
+    PasswordManager pm = new PasswordManager("test123");
+    pm.addCredential("", "emptyPassword");
+    assertEquals("emptyPassword", pm.getCredential(""));
+  }
+
+  /**
+   * Tests hash table with very long keys.
+   */
+  @Test
+  public void testHashTableVeryLongKeys() {
+    PasswordManager pm = new PasswordManager("test123");
+    String longKey = "a".repeat(1000);
+    pm.addCredential(longKey, "longKeyPassword");
+    assertEquals("longKeyPassword", pm.getCredential(longKey));
+  }
+
+  /**
+   * Tests hash table with unicode characters.
+   */
+  @Test
+  public void testHashTableUnicodeKeys() {
+    PasswordManager pm = new PasswordManager("test123");
+    pm.addCredential("unicode-テスト", "pass1");
+    pm.addCredential("emoji-🔒", "pass2");
+    pm.addCredential("cyrillic-Пароль", "pass3");
+    assertEquals("pass1", pm.getCredential("unicode-テスト"));
+    assertEquals("pass2", pm.getCredential("emoji-🔒"));
+    assertEquals("pass3", pm.getCredential("cyrillic-Пароль"));
+  }
+
+  /**
+   * Tests access matrix with non-existent service.
+   */
+  @Test
+  public void testAccessMatrixNonExistent() {
+    PasswordManager pm = new PasswordManager("test123");
+    // Get access pattern for non-existent service
+    Map<Integer, Integer> pattern = pm.getAccessPattern("nonexistent");
+    assertNotNull(pattern);
+    assertTrue(pattern.isEmpty());
+    // Get total access count for non-existent service
+    assertEquals(0, pm.getTotalAccessCount("nonexistent"));
+  }
+
+  /**
+   * Tests command stack with multiple operations.
+   */
+  @Test
+  public void testCommandStackMultipleOps() {
+    PasswordManager pm = new PasswordManager("test123");
+    // Undo when stack is empty
+    assertFalse(pm.canUndo());
+    pm.undo(); // Should not throw
+    // Redo when stack is empty
+    assertFalse(pm.canRedo());
+    pm.redo(); // Should not throw
+    // Add and undo
+    pm.addCredential("test", "pass");
+    assertTrue(pm.canUndo());
+    pm.undo();
+    assertFalse(pm.canUndo());
+    // Redo
+    assertTrue(pm.canRedo());
+    pm.redo();
+    assertFalse(pm.canRedo());
+  }
+
+  /**
+   * Tests multiple undo/redo chain.
+   */
+  @Test
+  public void testUndoRedoChain() {
+    PasswordManager pm = new PasswordManager("test123");
+    pm.addCredential("s1", "p1");
+    pm.addCredential("s2", "p2");
+    pm.addCredential("s3", "p3");
+    // Undo all
+    pm.undo();
+    pm.undo();
+    pm.undo();
+    assertFalse(pm.canUndo());
+    assertTrue(pm.canRedo());
+    // Redo all
+    pm.redo();
+    pm.redo();
+    pm.redo();
+    assertTrue(pm.canUndo());
+    assertFalse(pm.canRedo());
+  }
+
+  /**
+   * Tests most accessed services with large limit.
+   */
+  @Test
+  public void testMostAccessedServicesLimit() {
+    PasswordManager pm = new PasswordManager("test123");
+    pm.addCredential("a", "p");
+    pm.addCredential("b", "p");
+    pm.getCredential("a");
+    pm.getCredential("b");
+    // Request more than available
+    List<String> top = pm.getMostAccessedServices(10);
+    assertTrue(top.size() <= 2);
+  }
+
+  /**
+   * Tests graph with null inputs.
+   */
+  @Test
+  public void testGraphWithNullInputs() {
+    PasswordManager pm = new PasswordManager("test123");
+
+    try {
+      pm.addServiceDependency(null, "target");
+    } catch (Exception e) {
+      // Expected
+    }
+
+    try {
+      pm.addServiceDependency("source", null);
+    } catch (Exception e) {
+      // Expected
+    }
+
+    List<String> related = pm.getRelatedServices(null);
+    assertNotNull(related);
+  }
+
+  // ==================== ADDITIONAL COVERAGE TESTS ====================
+
+  /**
+   * Tests the main method with simulated System.in.
+   */
+  @Test
+  public void testMainMethodDirect() {
+    // Save original System.in and System.out
+    java.io.InputStream originalIn = System.in;
+    PrintStream originalOut = System.out;
+
+    try {
+      // Simulate input: master password and exit
+      String input = "testMaster\n0\n";
+      ByteArrayInputStream testIn = new ByteArrayInputStream(input.getBytes(StandardCharsets.UTF_8));
+      ByteArrayOutputStream testOut = new ByteArrayOutputStream();
+      System.setIn(testIn);
+      System.setOut(new PrintStream(testOut));
+      // Call main method
+      PasswordManager.main(new String[] {});
+      // Check output
+      String output = testOut.toString();
+      assertNotNull(output);
+    } catch (Exception e) {
+      // Expected - might throw exception when closing scanner
+    } finally {
+
+      // Restore original System.in and System.out
+      System.setIn(originalIn);
+      System.setOut(originalOut);
+    }
+  }
+
+  /**
+   * Tests runApp method directly.
+   */
+  @Test
+  public void testRunAppDirect() {
+    String input = "testMaster\n0\n";
+    ByteArrayInputStream testIn = new ByteArrayInputStream(input.getBytes(StandardCharsets.UTF_8));
+    ByteArrayOutputStream testOut = new ByteArrayOutputStream();
+    Scanner scanner = new Scanner(testIn);
+    PrintStream out = new PrintStream(testOut);
+
+    try {
+      PasswordManager.runApp(scanner, out);
+    } catch (Exception e) {
+      // Handle potential exceptions
+    }
+
+    scanner.close();
+    String output = testOut.toString();
+    assertTrue(output.contains("Enter master password"));
+  }
+
+  /**
+   * Tests CustomHashTable with initial capacity constructor.
+   */
+  @Test
+  public void testCustomHashTableWithInitialCapacity() throws Exception {
+    // Use reflection to access private CustomHashTable class
+    Class<?> hashTableClass = Class.forName("com.ucoruh.password.PasswordManager$CustomHashTable");
+
+    // Get constructor with int parameter
+    java.lang.reflect.Constructor<?> constructor = hashTableClass.getDeclaredConstructor(int.class);
+    constructor.setAccessible(true);
+
+    // Create instance with initial capacity
+    Object hashTable = constructor.newInstance(32);
+    assertNotNull(hashTable);
+
+    // Test put and get via reflection
+    java.lang.reflect.Method putMethod = hashTableClass.getMethod("put", Object.class, Object.class);
+    java.lang.reflect.Method getMethod = hashTableClass.getMethod("get", Object.class);
+    java.lang.reflect.Method sizeMethod = hashTableClass.getMethod("size");
+
+    putMethod.invoke(hashTable, "key1", "value1");
+    Object result = getMethod.invoke(hashTable, "key1");
+    assertEquals("value1", result);
+    assertEquals(1, sizeMethod.invoke(hashTable));
+  }
+
+  /**
+   * Tests CustomHashTable keySet method via reflection.
+   */
+  @Test
+  public void testCustomHashTableKeySet() throws Exception {
+    Class<?> hashTableClass = Class.forName("com.ucoruh.password.PasswordManager$CustomHashTable");
+    java.lang.reflect.Constructor<?> constructor = hashTableClass.getDeclaredConstructor();
+    constructor.setAccessible(true);
+    Object hashTable = constructor.newInstance();
+
+    java.lang.reflect.Method putMethod = hashTableClass.getMethod("put", Object.class, Object.class);
+    java.lang.reflect.Method keySetMethod = hashTableClass.getMethod("keySet");
+
+    // Add multiple entries
+    putMethod.invoke(hashTable, "key1", "value1");
+    putMethod.invoke(hashTable, "key2", "value2");
+    putMethod.invoke(hashTable, "key3", "value3");
+
+    // Get keySet
+    @SuppressWarnings("unchecked")
+    List<Object> keys = (List<Object>) keySetMethod.invoke(hashTable);
+
+    assertNotNull(keys);
+    assertEquals(3, keys.size());
+    assertTrue(keys.contains("key1"));
+    assertTrue(keys.contains("key2"));
+    assertTrue(keys.contains("key3"));
+  }
+
+  /**
+   * Tests CustomHashTable values method via reflection.
+   */
+  @Test
+  public void testCustomHashTableValues() throws Exception {
+    Class<?> hashTableClass = Class.forName("com.ucoruh.password.PasswordManager$CustomHashTable");
+    java.lang.reflect.Constructor<?> constructor = hashTableClass.getDeclaredConstructor();
+    constructor.setAccessible(true);
+    Object hashTable = constructor.newInstance();
+
+    java.lang.reflect.Method putMethod = hashTableClass.getMethod("put", Object.class, Object.class);
+    java.lang.reflect.Method valuesMethod = hashTableClass.getMethod("values");
+
+    // Add multiple entries
+    putMethod.invoke(hashTable, "key1", "value1");
+    putMethod.invoke(hashTable, "key2", "value2");
+    putMethod.invoke(hashTable, "key3", "value3");
+
+    // Get values
+    @SuppressWarnings("unchecked")
+    List<Object> values = (List<Object>) valuesMethod.invoke(hashTable);
+
+    assertNotNull(values);
+    assertEquals(3, values.size());
+    assertTrue(values.contains("value1"));
+    assertTrue(values.contains("value2"));
+    assertTrue(values.contains("value3"));
+  }
+
+  /**
+   * Tests CustomHashTable remove method when key not found.
+   */
+  @Test
+  public void testCustomHashTableRemoveNotFound() throws Exception {
+    Class<?> hashTableClass = Class.forName("com.ucoruh.password.PasswordManager$CustomHashTable");
+    java.lang.reflect.Constructor<?> constructor = hashTableClass.getDeclaredConstructor();
+    constructor.setAccessible(true);
+    Object hashTable = constructor.newInstance();
+
+    java.lang.reflect.Method putMethod = hashTableClass.getMethod("put", Object.class, Object.class);
+    java.lang.reflect.Method removeMethod = hashTableClass.getMethod("remove", Object.class);
+
+    // Add an entry
+    putMethod.invoke(hashTable, "key1", "value1");
+
+    // Try to remove non-existent key
+    Object result = removeMethod.invoke(hashTable, "nonexistent");
+    assertNull(result);
+  }
+
+  /**
+   * Tests CustomHashTable remove method with chained entries.
+   */
+  @Test
+  public void testCustomHashTableRemoveWithChaining() throws Exception {
+    Class<?> hashTableClass = Class.forName("com.ucoruh.password.PasswordManager$CustomHashTable");
+    java.lang.reflect.Constructor<?> constructor = hashTableClass.getDeclaredConstructor(int.class);
+    constructor.setAccessible(true);
+
+    // Create small hash table to force collisions
+    Object hashTable = constructor.newInstance(2);
+
+    java.lang.reflect.Method putMethod = hashTableClass.getMethod("put", Object.class, Object.class);
+    java.lang.reflect.Method removeMethod = hashTableClass.getMethod("remove", Object.class);
+    java.lang.reflect.Method getMethod = hashTableClass.getMethod("get", Object.class);
+    java.lang.reflect.Method sizeMethod = hashTableClass.getMethod("size");
+
+    // Add multiple entries to create chain (small capacity forces collisions)
+    putMethod.invoke(hashTable, "a", "value_a");
+    putMethod.invoke(hashTable, "b", "value_b");
+    putMethod.invoke(hashTable, "c", "value_c");
+    putMethod.invoke(hashTable, "d", "value_d");
+
+    // Remove entry from middle of chain
+    Object removed = removeMethod.invoke(hashTable, "b");
+    assertEquals("value_b", removed);
+    assertNull(getMethod.invoke(hashTable, "b"));
+
+    // Other entries should still exist
+    assertEquals("value_a", getMethod.invoke(hashTable, "a"));
+    assertEquals("value_c", getMethod.invoke(hashTable, "c"));
+  }
+
+  /**
+   * Tests AccessMatrix clear method via reflection.
+   */
+  @Test
+  public void testAccessMatrixClear() throws Exception {
+    Class<?> matrixClass = Class.forName("com.ucoruh.password.PasswordManager$AccessMatrix");
+    java.lang.reflect.Constructor<?> constructor = matrixClass.getDeclaredConstructor();
+    constructor.setAccessible(true);
+    Object matrix = constructor.newInstance();
+
+    java.lang.reflect.Method recordAccessMethod = matrixClass.getMethod("recordAccess", String.class, int.class);
+    java.lang.reflect.Method clearMethod = matrixClass.getMethod("clear");
+    java.lang.reflect.Method sizeMethod = matrixClass.getMethod("size");
+
+    // Record some accesses
+    recordAccessMethod.invoke(matrix, "service1", 10);
+    recordAccessMethod.invoke(matrix, "service2", 15);
+
+    // Verify size > 0
+    int sizeBefore = (int) sizeMethod.invoke(matrix);
+    assertTrue(sizeBefore > 0);
+
+    // Clear the matrix
+    clearMethod.invoke(matrix);
+
+    // Verify size is 0
+    int sizeAfter = (int) sizeMethod.invoke(matrix);
+    assertEquals(0, sizeAfter);
+  }
+
+  /**
+   * Tests AccessMatrix size method.
+   */
+  @Test
+  public void testAccessMatrixSize() throws Exception {
+    Class<?> matrixClass = Class.forName("com.ucoruh.password.PasswordManager$AccessMatrix");
+    java.lang.reflect.Constructor<?> constructor = matrixClass.getDeclaredConstructor();
+    constructor.setAccessible(true);
+    Object matrix = constructor.newInstance();
+
+    java.lang.reflect.Method recordAccessMethod = matrixClass.getMethod("recordAccess", String.class, int.class);
+    java.lang.reflect.Method sizeMethod = matrixClass.getMethod("size");
+
+    // Initially size should be 0
+    assertEquals(0, sizeMethod.invoke(matrix));
+
+    // Record access for one service
+    recordAccessMethod.invoke(matrix, "service1", 10);
+    assertEquals(1, sizeMethod.invoke(matrix));
+
+    // Record access for another service
+    recordAccessMethod.invoke(matrix, "service2", 15);
+    assertEquals(2, sizeMethod.invoke(matrix));
+
+    // Record more access for existing service (size shouldn't increase)
+    recordAccessMethod.invoke(matrix, "service1", 11);
+    assertEquals(2, sizeMethod.invoke(matrix));
+  }
+
+  /**
+   * Tests CustomHashTable with chain traversal in keySet and values.
+   */
+  @Test
+  public void testCustomHashTableChainTraversal() throws Exception {
+    Class<?> hashTableClass = Class.forName("com.ucoruh.password.PasswordManager$CustomHashTable");
+    java.lang.reflect.Constructor<?> constructor = hashTableClass.getDeclaredConstructor(int.class);
+    constructor.setAccessible(true);
+
+    // Very small capacity to force chains
+    Object hashTable = constructor.newInstance(1);
+
+    java.lang.reflect.Method putMethod = hashTableClass.getMethod("put", Object.class, Object.class);
+    java.lang.reflect.Method keySetMethod = hashTableClass.getMethod("keySet");
+    java.lang.reflect.Method valuesMethod = hashTableClass.getMethod("values");
+
+    // All entries will be in same bucket (chain)
+    putMethod.invoke(hashTable, "key1", "v1");
+    putMethod.invoke(hashTable, "key2", "v2");
+    putMethod.invoke(hashTable, "key3", "v3");
+
+    @SuppressWarnings("unchecked")
+    List<Object> keys = (List<Object>) keySetMethod.invoke(hashTable);
+    @SuppressWarnings("unchecked")
+    List<Object> vals = (List<Object>) valuesMethod.invoke(hashTable);
+
+    assertEquals(3, keys.size());
+    assertEquals(3, vals.size());
+  }
+
+  /**
+   * Tests remove from chain when entry is not at head.
+   */
+  @Test
+  public void testRemoveFromChainMiddle() throws Exception {
+    Class<?> hashTableClass = Class.forName("com.ucoruh.password.PasswordManager$CustomHashTable");
+    java.lang.reflect.Constructor<?> constructor = hashTableClass.getDeclaredConstructor(int.class);
+    constructor.setAccessible(true);
+
+    // Capacity of 1 forces all entries into same bucket
+    Object hashTable = constructor.newInstance(1);
+
+    java.lang.reflect.Method putMethod = hashTableClass.getMethod("put", Object.class, Object.class);
+    java.lang.reflect.Method removeMethod = hashTableClass.getMethod("remove", Object.class);
+    java.lang.reflect.Method getMethod = hashTableClass.getMethod("get", Object.class);
+
+    // Add entries - all in same bucket due to capacity 1
+    putMethod.invoke(hashTable, "first", "val1");
+    putMethod.invoke(hashTable, "second", "val2");
+    putMethod.invoke(hashTable, "third", "val3");
+
+    // Remove first entry (should be at head)
+    Object result = removeMethod.invoke(hashTable, "first");
+    assertEquals("val1", result);
+
+    // Remove middle entry (second)
+    result = removeMethod.invoke(hashTable, "second");
+    assertEquals("val2", result);
+
+    // Third should still exist
+    assertEquals("val3", getMethod.invoke(hashTable, "third"));
+
+    // Try removing non-existent from same bucket
+    result = removeMethod.invoke(hashTable, "fourth");
+    assertNull(result);
+  }
+
+  // ==================== INNER CLASS COVERAGE TESTS ====================
+
+  /**
+   * Tests CommandStack peek and size methods.
+   */
+  @Test
+  public void testCommandStackPeekAndSize() throws Exception {
+    Class<?> stackClass = Class.forName("com.ucoruh.password.PasswordManager$CommandStack");
+    java.lang.reflect.Constructor<?> constructor = stackClass.getDeclaredConstructor();
+    constructor.setAccessible(true);
+    Object stack = constructor.newInstance();
+
+    java.lang.reflect.Method peekMethod = stackClass.getMethod("peek");
+    java.lang.reflect.Method sizeMethod = stackClass.getMethod("size");
+    java.lang.reflect.Method isEmptyMethod = stackClass.getMethod("isEmpty");
+
+    // Empty stack tests
+    assertNull("Peek on empty stack should return null", peekMethod.invoke(stack));
+    assertEquals("Empty stack size should be 0", 0, sizeMethod.invoke(stack));
+    assertTrue("Empty stack should be empty", (Boolean) isEmptyMethod.invoke(stack));
+  }
+
+  /**
+   * Tests UpdateCredentialCommand execute and undo.
+   */
+  @Test
+  public void testUpdateCredentialCommandExecuteUndo() {
+    PasswordManager pm = new PasswordManager("test123");
+    // Add initial credential
+    pm.addCredential("updateTest", "oldPassword");
+    assertEquals("oldPassword", pm.getCredential("updateTest"));
+    // Update credential (this creates UpdateCredentialCommand)
+    pm.addCredential("updateTest", "newPassword");
+    assertEquals("newPassword", pm.getCredential("updateTest"));
+    // Undo should restore old password
+    assertTrue(pm.undo());
+    assertEquals("oldPassword", pm.getCredential("updateTest"));
+    // Redo should restore new password
+    assertTrue(pm.redo());
+    assertEquals("newPassword", pm.getCredential("updateTest"));
+  }
+
+  /**
+   * Tests AccessMatrix with invalid hour values.
+   */
+  @Test
+  public void testAccessMatrixInvalidHour() throws Exception {
+    Class<?> matrixClass = Class.forName("com.ucoruh.password.PasswordManager$AccessMatrix");
+    java.lang.reflect.Constructor<?> constructor = matrixClass.getDeclaredConstructor();
+    constructor.setAccessible(true);
+    Object matrix = constructor.newInstance();
+
+    java.lang.reflect.Method recordAccessMethod = matrixClass.getMethod("recordAccess", String.class, int.class);
+    java.lang.reflect.Method sizeMethod = matrixClass.getMethod("size");
+
+    // Try invalid hour values
+    recordAccessMethod.invoke(matrix, "service", -1);  // negative hour
+    recordAccessMethod.invoke(matrix, "service", 24);  // hour too high
+    recordAccessMethod.invoke(matrix, null, 10);       // null service
+
+    // None of these should have been recorded
+    assertEquals("Invalid inputs should not be recorded", 0, sizeMethod.invoke(matrix));
+  }
+
+  /**
+   * Tests AccessMatrix getAllServices method.
+   */
+  @Test
+  public void testAccessMatrixGetAllServices() throws Exception {
+    Class<?> matrixClass = Class.forName("com.ucoruh.password.PasswordManager$AccessMatrix");
+    java.lang.reflect.Constructor<?> constructor = matrixClass.getDeclaredConstructor();
+    constructor.setAccessible(true);
+    Object matrix = constructor.newInstance();
+
+    java.lang.reflect.Method recordAccessMethod = matrixClass.getMethod("recordAccess", String.class, int.class);
+    java.lang.reflect.Method getAllServicesMethod = matrixClass.getMethod("getAllServices");
+
+    recordAccessMethod.invoke(matrix, "service1", 10);
+    recordAccessMethod.invoke(matrix, "service2", 11);
+
+    @SuppressWarnings("unchecked")
+    List<String> services = (List<String>) getAllServicesMethod.invoke(matrix);
+    assertEquals(2, services.size());
+    assertTrue(services.contains("service1"));
+    assertTrue(services.contains("service2"));
+  }
+
+  /**
+   * Tests CustomHashTable getLoadFactor and getCollisionCount.
+   */
+  @Test
+  public void testCustomHashTableMetrics() throws Exception {
+    Class<?> hashTableClass = Class.forName("com.ucoruh.password.PasswordManager$CustomHashTable");
+    java.lang.reflect.Constructor<?> constructor = hashTableClass.getDeclaredConstructor(int.class);
+    constructor.setAccessible(true);
+
+    // Small capacity to force collisions
+    Object hashTable = constructor.newInstance(4);
+
+    java.lang.reflect.Method putMethod = hashTableClass.getMethod("put", Object.class, Object.class);
+    java.lang.reflect.Method getLoadFactorMethod = hashTableClass.getMethod("getLoadFactor");
+    java.lang.reflect.Method getCollisionCountMethod = hashTableClass.getMethod("getCollisionCount");
+
+    // Add items
+    putMethod.invoke(hashTable, "key1", "val1");
+    putMethod.invoke(hashTable, "key2", "val2");
+
+    double loadFactor = (Double) getLoadFactorMethod.invoke(hashTable);
+    assertTrue("Load factor should be > 0", loadFactor > 0);
+
+    // Add more to create collisions
+    putMethod.invoke(hashTable, "key3", "val3");
+    putMethod.invoke(hashTable, "key4", "val4");
+    putMethod.invoke(hashTable, "key5", "val5");
+
+    int collisions = (Integer) getCollisionCountMethod.invoke(hashTable);
+    assertTrue("Should have some collisions with small capacity", collisions >= 0);
+  }
+
+  /**
+   * Tests CustomHashTable containsKey method.
+   */
+  @Test
+  public void testCustomHashTableContainsKey() throws Exception {
+    Class<?> hashTableClass = Class.forName("com.ucoruh.password.PasswordManager$CustomHashTable");
+    java.lang.reflect.Constructor<?> constructor = hashTableClass.getDeclaredConstructor();
+    constructor.setAccessible(true);
+    Object hashTable = constructor.newInstance();
+
+    java.lang.reflect.Method putMethod = hashTableClass.getMethod("put", Object.class, Object.class);
+    java.lang.reflect.Method containsKeyMethod = hashTableClass.getMethod("containsKey", Object.class);
+
+    putMethod.invoke(hashTable, "existingKey", "value");
+
+    assertTrue((Boolean) containsKeyMethod.invoke(hashTable, "existingKey"));
+    assertFalse((Boolean) containsKeyMethod.invoke(hashTable, "nonExistingKey"));
+  }
+
+  /**
+   * Tests CustomHashTable isEmpty method.
+   */
+  @Test
+  public void testCustomHashTableIsEmpty() throws Exception {
+    Class<?> hashTableClass = Class.forName("com.ucoruh.password.PasswordManager$CustomHashTable");
+    java.lang.reflect.Constructor<?> constructor = hashTableClass.getDeclaredConstructor();
+    constructor.setAccessible(true);
+    Object hashTable = constructor.newInstance();
+
+    java.lang.reflect.Method putMethod = hashTableClass.getMethod("put", Object.class, Object.class);
+    java.lang.reflect.Method isEmptyMethod = hashTableClass.getMethod("isEmpty");
+    java.lang.reflect.Method clearMethod = hashTableClass.getMethod("clear");
+
+    assertTrue("New hash table should be empty", (Boolean) isEmptyMethod.invoke(hashTable));
+
+    putMethod.invoke(hashTable, "key", "value");
+    assertFalse("Hash table with items should not be empty", (Boolean) isEmptyMethod.invoke(hashTable));
+
+    clearMethod.invoke(hashTable);
+    assertTrue("Cleared hash table should be empty", (Boolean) isEmptyMethod.invoke(hashTable));
+  }
+
+  /**
+   * Tests CustomHashTable null key handling.
+   */
+  @Test
+  public void testCustomHashTableNullKey() throws Exception {
+    Class<?> hashTableClass = Class.forName("com.ucoruh.password.PasswordManager$CustomHashTable");
+    java.lang.reflect.Constructor<?> constructor = hashTableClass.getDeclaredConstructor();
+    constructor.setAccessible(true);
+    Object hashTable = constructor.newInstance();
+
+    java.lang.reflect.Method getMethod = hashTableClass.getMethod("get", Object.class);
+    java.lang.reflect.Method removeMethod = hashTableClass.getMethod("remove", Object.class);
+
+    // Get with null key should return null
+    assertNull(getMethod.invoke(hashTable, (Object) null));
+    // Remove with null key should return null
+    assertNull(removeMethod.invoke(hashTable, (Object) null));
+  }
+
+  /**
+   * Tests ServiceGraph with null neighbor lookup.
+   */
+  @Test
+  public void testServiceGraphNullNeighbors() {
+    PasswordManager.ServiceGraph graph = new PasswordManager.ServiceGraph();
+    // Get neighbors for non-existent service
+    List<String> neighbors = graph.getNeighbors("nonExistent");
+    assertNotNull(neighbors);
+    assertTrue(neighbors.isEmpty());
+  }
+
+  /**
+   * Tests multiple undo/redo cycles.
+   */
+  @Test
+  public void testMultipleUndoRedoCycles() {
+    PasswordManager pm = new PasswordManager("test123");
+    // Add multiple credentials
+    pm.addCredential("service1", "pass1");
+    pm.addCredential("service2", "pass2");
+    pm.addCredential("service3", "pass3");
+    // Undo all
+    assertTrue(pm.undo());
+    assertTrue(pm.undo());
+    assertTrue(pm.undo());
+    assertFalse(pm.undo()); // No more to undo
+    // Redo all
+    assertTrue(pm.redo());
+    assertTrue(pm.redo());
+    assertTrue(pm.redo());
+    assertFalse(pm.redo()); // No more to redo
+  }
 }

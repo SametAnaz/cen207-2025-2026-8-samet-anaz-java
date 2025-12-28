@@ -848,4 +848,136 @@ public class PasswordGeneratorTest {
     String decompressed = PasswordGenerator.decompressPassword(compressed, root);
     assertEquals("Decompressed should match original with special chars", password, decompressed);
   }
+
+  // ==================== ADDITIONAL COVERAGE TESTS ====================
+
+  /**
+   * Tests HuffmanNode compareTo method.
+   */
+  @Test
+  public void testHuffmanNodeCompareTo() {
+    PasswordGenerator.HuffmanNode node1 = new PasswordGenerator.HuffmanNode('a', 5);
+    PasswordGenerator.HuffmanNode node2 = new PasswordGenerator.HuffmanNode('b', 10);
+    PasswordGenerator.HuffmanNode node3 = new PasswordGenerator.HuffmanNode('c', 5);
+    assertTrue("Node with lower frequency should be less", node1.compareTo(node2) < 0);
+    assertTrue("Node with higher frequency should be greater", node2.compareTo(node1) > 0);
+    assertEquals("Nodes with equal frequency should be equal", 0, node1.compareTo(node3));
+  }
+
+  /**
+   * Tests HuffmanNode internal node constructor.
+   */
+  @Test
+  public void testHuffmanNodeInternalConstructor() {
+    PasswordGenerator.HuffmanNode left = new PasswordGenerator.HuffmanNode('a', 5);
+    PasswordGenerator.HuffmanNode right = new PasswordGenerator.HuffmanNode('b', 10);
+    PasswordGenerator.HuffmanNode internal = new PasswordGenerator.HuffmanNode(15, left, right);
+    assertFalse("Internal node should not be leaf", internal.isLeaf());
+    assertTrue("Left child should be leaf", left.isLeaf());
+    assertTrue("Right child should be leaf", right.isLeaf());
+  }
+
+  /**
+   * Tests generatePassword with only uppercase.
+   */
+  @Test
+  public void testGeneratePasswordOnlyUppercase() {
+    String password = PasswordGenerator.generatePassword(10, true, false, false, false);
+    assertEquals(10, password.length());
+
+    for (char c : password.toCharArray()) {
+      assertTrue("Should be uppercase", Character.isUpperCase(c));
+    }
+  }
+
+  /**
+   * Tests generatePassword with no character sets selected (defaults to lowercase).
+   */
+  @Test
+  public void testGeneratePasswordNoCharSets() {
+    String password = PasswordGenerator.generatePassword(10, false, false, false, false);
+    assertEquals(10, password.length());
+
+    // Should default to lowercase
+    for (char c : password.toCharArray()) {
+      assertTrue("Should be lowercase", Character.isLowerCase(c));
+    }
+  }
+
+  /**
+   * Tests generatePassword with length 1, 2, 3.
+   */
+  @Test
+  public void testGeneratePasswordShortLengths() {
+    // Length 1 - only uppercase
+    String pass1 = PasswordGenerator.generatePassword(1, true, true, true, true);
+    assertEquals(1, pass1.length());
+    // Length 2 - uppercase + lowercase
+    String pass2 = PasswordGenerator.generatePassword(2, true, true, true, true);
+    assertEquals(2, pass2.length());
+    // Length 3 - uppercase + lowercase + digit
+    String pass3 = PasswordGenerator.generatePassword(3, true, true, true, true);
+    assertEquals(3, pass3.length());
+  }
+
+  /**
+   * Tests isWeakPattern with null input.
+   */
+  @Test
+  public void testIsWeakPatternNullInput() {
+    assertTrue("Null password should be weak", PasswordGenerator.isWeakPattern(null));
+  }
+
+  /**
+   * Tests isWeakPattern with empty input.
+   */
+  @Test
+  public void testIsWeakPatternEmptyInput() {
+    assertTrue("Empty password should be weak", PasswordGenerator.isWeakPattern(""));
+  }
+
+  /**
+   * Tests isWeakPattern with repeated characters.
+   */
+  @Test
+  public void testIsWeakPatternRepeatedChars() {
+    assertTrue("Password with repeated chars should be weak", PasswordGenerator.isWeakPattern("aaabbb"));
+    assertTrue("Password with repeated digits should be weak", PasswordGenerator.isWeakPattern("111222"));
+  }
+
+  /**
+   * Tests isWeakPattern with sequential digits.
+   */
+  @Test
+  public void testIsWeakPatternSequentialDigits() {
+    assertTrue("456 sequence should be weak", PasswordGenerator.isWeakPattern("abc456def"));
+    assertTrue("789 sequence should be weak", PasswordGenerator.isWeakPattern("pass789word"));
+  }
+
+  /**
+   * Tests kmpSearch with pattern longer than text.
+   */
+  @Test
+  public void testKmpSearchPatternLongerThanText() {
+    int result = PasswordGenerator.kmpSearch("abc", "abcdefgh");
+    assertEquals(-1, result);
+  }
+
+  /**
+   * Tests kmpSearch with empty pattern.
+   */
+  @Test
+  public void testKmpSearchEmptyPatternExtra() {
+    int result = PasswordGenerator.kmpSearch("test", "");
+    assertEquals(-1, result);
+  }
+
+  /**
+   * Tests PasswordGenerator constructor.
+   */
+  @Test
+  public void testPasswordGeneratorConstructorExtra() {
+    PasswordGenerator generator = new PasswordGenerator();
+    assertNotNull(generator);
+  }
 }

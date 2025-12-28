@@ -2,815 +2,498 @@ package com.ucoruh.password;
 
 import org.junit.*;
 import java.io.*;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.Statement;
-import java.sql.PreparedStatement;
-import java.sql.SQLException;
+import java.sql.*;
+import java.nio.file.*;
 
 import static org.junit.Assert.*;
 
 /**
  * @brief Test class for DatabasePasswordStorage.
  *
- * This class contains unit tests for DatabasePasswordStorage operations.
+ * This class contains unit tests for DatabasePasswordStorage operations
+ * using the default database file with proper setup/cleanup.
  */
 public class DatabasePasswordStorageTest {
 
-    private DatabasePasswordStorage database;
-    private ByteArrayOutputStream outContent = new ByteArrayOutputStream();
-    private PrintStream originalOut = System.out;
-    private static final String TEST_MASTER_PASSWORD = "test-master-password";
-    
-    /**
-     * Test database URL for in-memory SQLite database.
-     */
-    private static final String TEST_DB_URL = "jdbc:sqlite::memory:";
+  private DatabasePasswordStorage storage;
+  private ByteArrayOutputStream outContent;
+  private PrintStream originalOut;
+  private static final String TEST_MASTER_PASSWORD = "test-master-password-123";
 
-    /**
-     * Setup method for preparing the database storage instance.
-     * @throws Exception if database setup fails
-     */
-    @Before
-    public void setUp() throws Exception {
-        // Create a test password storage with a test master password and use a test database
-        database = new DatabasePasswordStorage(TEST_MASTER_PASSWORD) {
-            @Override
-            protected String getDatabaseUrl() {
-                return TEST_DB_URL;
-            }
-        };
-        
-        System.setOut(new PrintStream(outContent));
-        
-        // Ensure the database is clean and initialized for each test
-        try (Connection conn = DriverManager.getConnection(TEST_DB_URL)) {
-            // First drop the table if it exists to start fresh
-            try (Statement stmt = conn.createStatement()) {
-                stmt.execute("DROP TABLE IF EXISTS passwords");
-            }
-            
-            // Create the table
-            try (Statement stmt = conn.createStatement()) {
-                String sql = """
-                    CREATE TABLE passwords (
-                        service TEXT PRIMARY KEY,
-                        username TEXT NOT NULL,
-                        password TEXT NOT NULL
-                    )
-                    """;
-                stmt.execute(sql);
-                System.out.println("Created passwords table successfully");
-            }
-            
-            // Verify the table was created
-            try (ResultSet rs = conn.getMetaData().getTables(null, null, "passwords", null)) {
-                if (!rs.next()) {
-                    throw new SQLException("Failed to create passwords table");
-                }
-            }
-            
-            // Verify table structure
-            try (ResultSet rs = conn.createStatement().executeQuery("PRAGMA table_info(passwords)")) {
-                boolean hasService = false;
-                boolean hasUsername = false;
-                boolean hasPassword = false;
-                
-                while (rs.next()) {
-                    String columnName = rs.getString("name");
-                    switch (columnName.toLowerCase()) {
-                        case "service" -> hasService = true;
-                        case "username" -> hasUsername = true;
-                        case "password" -> hasPassword = true;
-                    }
-                }
-                
-                if (!hasService || !hasUsername || !hasPassword) {
-                    throw new SQLException("Table structure verification failed");
-                }
-            }
-        } catch (SQLException e) {
-            System.err.println("Critical error during database setup: " + e.getMessage());
-            e.printStackTrace();
-            throw e; // Re-throw to fail the test
-        }
+  @Before
+  public void setUp() throws Exception {
+    // Clean up any existing database
+    cleanupDatabase();
+
+    // Set up output capture
+    originalOut = System.out;
+    outContent = new ByteArrayOutputStream();
+    System.setOut(new PrintStream(outContent));
+
+    // Create the storage instance
+    storage = new DatabasePasswordStorage(TEST_MASTER_PASSWORD);
+  }
+
+  @After
+  public void tearDown() {
+    System.setOut(originalOut);
+    cleanupDatabase();
+  }
+
+  /**
+   * Helper method to clean up the database file.
+   */
+  private void cleanupDatabase() {
+    try {
+      // Delete default database file
+      Files.deleteIfExists(Path.of("passwords.db"));
+    } catch (Exception e) {
+      // Ignore
+    }
+  }
+
+  /**
+   * Helper method to add a test entry via Scanner simulation.
+   */
+  private void addEntry(String service, String username, String password) {
+    String input = service + "\n" + username + "\n" + password + "\n";
+    Scanner scanner = new Scanner(new ByteArrayInputStream(input.getBytes()));
+    storage.add(scanner);
+  }
+
+  // ==================== CONSTRUCTOR TESTS ====================
+
+  @Test
+  public void testConstructor() {
+    assertNotNull("Storage should be created", storage);
+  }
+
+  @Test
+  public void testGetDatabaseUrl() {
+    String url = storage.getDatabaseUrl();
+    assertNotNull("URL should not be null", url);
+    assertTrue("URL should be SQLite", url.contains("jdbc:sqlite:"));
+  }
+
+  @Test
+  public void testConstructorCreatesTable() {
+    // The table should be created automatically
+    // Verify by trying to read from it
+    List<Password> passwords = storage.readAll();
+    assertNotNull("Should be able to read from table", passwords);
+  }
+
+  // ==================== ADD METHOD TESTS ====================
+
+  @Test
+  public void testAddNewEntry() {
+    outContent.reset();
+    addEntry("TestService", "testuser@example.com", "TestPassword123");
+    String output = outContent.toString();
+    assertTrue("Should show success", output.contains("Password saved successfully"));
+  }
+
+  @Test
+  public void testAddShowsPrompts() {
+    outContent.reset();
+    addEntry("PromptTest", "user", "pass");
+    String output = outContent.toString();
+    assertTrue("Should prompt for service", output.contains("Service:"));
+    assertTrue("Should prompt for username", output.contains("Username:"));
+    assertTrue("Should prompt for password", output.contains("Password:"));
+  }
+
+  @Test
+  public void testAddDuplicateService() {
+    addEntry("DuplicateService", "user1", "pass1");
+    outContent.reset();
+    addEntry("DuplicateService", "user2", "pass2");
+    String output = outContent.toString();
+    assertTrue("Should show duplicate error", output.contains("already exists"));
+  }
+
+  @Test
+  public void testAddMultipleServices() {
+    addEntry("Service1", "user1", "pass1");
+    addEntry("Service2", "user2", "pass2");
+    addEntry("Service3", "user3", "pass3");
+    List<Password> passwords = storage.readAll();
+    assertEquals("Should have 3 entries", 3, passwords.size());
+  }
+
+  @Test
+  public void testAddSpecialCharacters() {
+    outContent.reset();
+    addEntry("Service@123", "user!@#$%", "P@ss_w0rd!");
+    String output = outContent.toString();
+    assertTrue("Should save special chars", output.contains("Password saved successfully"));
+  }
+
+  // ==================== VIEW METHOD TESTS ====================
+
+  @Test
+  public void testViewEmptyDatabase() {
+    outContent.reset();
+    storage.view();
+    String output = outContent.toString();
+    assertTrue("Should show no records", output.contains("No records found"));
+  }
+
+  @Test
+  public void testViewWithEntries() {
+    addEntry("ViewService1", "viewuser1", "viewpass1");
+    addEntry("ViewService2", "viewuser2", "viewpass2");
+    outContent.reset();
+    storage.view();
+    String output = outContent.toString();
+    assertTrue("Should contain service1", output.contains("ViewService1"));
+    assertTrue("Should contain service2", output.contains("ViewService2"));
+  }
+
+  @Test
+  public void testViewShowsNumberedList() {
+    addEntry("NumberedService", "numuser", "numpass");
+    outContent.reset();
+    storage.view();
+    String output = outContent.toString();
+    assertTrue("Should show numbered entry", output.contains("1."));
+  }
+
+  @Test
+  public void testViewDecryptsCorrectly() {
+    String testUsername = "decryptuser@test.com";
+    addEntry("DecryptService", testUsername, "decryptpass");
+    outContent.reset();
+    storage.view();
+    String output = outContent.toString();
+    assertTrue("Should show decrypted username", output.contains(testUsername));
+  }
+
+  // ==================== UPDATE METHOD TESTS ====================
+
+  @Test
+  public void testUpdateBothFields() {
+    addEntry("UpdateService", "olduser", "oldpass");
+    outContent.reset();
+    String input = "UpdateService\nnewuser\nnewpass\n";
+    Scanner scanner = new Scanner(new ByteArrayInputStream(input.getBytes()));
+    storage.update(scanner);
+    String output = outContent.toString();
+    assertTrue("Should show success", output.contains("updated successfully"));
+  }
+
+  @Test
+  public void testUpdateOnlyPassword() {
+    addEntry("UpdatePwdService", "keepuser", "oldpwd");
+    outContent.reset();
+    String input = "UpdatePwdService\n\nnewpwd\n";  // Empty username
+    Scanner scanner = new Scanner(new ByteArrayInputStream(input.getBytes()));
+    storage.update(scanner);
+    String output = outContent.toString();
+    assertTrue("Should show success", output.contains("updated successfully"));
+  }
+
+  @Test
+  public void testUpdateOnlyUsername() {
+    addEntry("UpdateUserService", "oldname", "keeppass");
+    outContent.reset();
+    String input = "UpdateUserService\nnewname\n\n";  // Empty password
+    Scanner scanner = new Scanner(new ByteArrayInputStream(input.getBytes()));
+    storage.update(scanner);
+    String output = outContent.toString();
+    assertTrue("Should show success", output.contains("updated successfully"));
+  }
+
+  @Test
+  public void testUpdateNonExistent() {
+    outContent.reset();
+    String input = "NonExistentService\nnewuser\nnewpass\n";
+    Scanner scanner = new Scanner(new ByteArrayInputStream(input.getBytes()));
+    storage.update(scanner);
+    String output = outContent.toString();
+    assertTrue("Should show not found", output.contains("not found"));
+  }
+
+  @Test
+  public void testUpdateShowsCurrentUsername() {
+    String originalUser = "originaluser@test.com";
+    addEntry("CurrentUserService", originalUser, "somepass");
+    outContent.reset();
+    String input = "CurrentUserService\nnewuser\nnewpass\n";
+    Scanner scanner = new Scanner(new ByteArrayInputStream(input.getBytes()));
+    storage.update(scanner);
+    String output = outContent.toString();
+    assertTrue("Should show current user", output.contains(originalUser));
+  }
+
+  // ==================== DELETE METHOD TESTS ====================
+
+  @Test
+  public void testDeleteExisting() {
+    addEntry("DeleteService", "deluser", "delpass");
+    outContent.reset();
+    String input = "DeleteService\n";
+    Scanner scanner = new Scanner(new ByteArrayInputStream(input.getBytes()));
+    storage.delete(scanner);
+    String output = outContent.toString();
+    assertTrue("Should show success", output.contains("deleted successfully"));
+  }
+
+  @Test
+  public void testDeleteNonExistent() {
+    outContent.reset();
+    String input = "NonExistentDeleteService\n";
+    Scanner scanner = new Scanner(new ByteArrayInputStream(input.getBytes()));
+    storage.delete(scanner);
+    String output = outContent.toString();
+    assertTrue("Should show not found", output.contains("not found"));
+  }
+
+  @Test
+  public void testDeleteVerifyRemoval() {
+    addEntry("VerifyDeleteService", "user", "pass");
+    assertEquals("Should have 1 entry", 1, storage.readAll().size());
+    String input = "VerifyDeleteService\n";
+    Scanner scanner = new Scanner(new ByteArrayInputStream(input.getBytes()));
+    storage.delete(scanner);
+    assertEquals("Should have 0 entries", 0, storage.readAll().size());
+  }
+
+  @Test
+  public void testDeleteShowsPrompt() {
+    addEntry("PromptDeleteService", "user", "pass");
+    outContent.reset();
+    String input = "PromptDeleteService\n";
+    Scanner scanner = new Scanner(new ByteArrayInputStream(input.getBytes()));
+    storage.delete(scanner);
+    String output = outContent.toString();
+    assertTrue("Should prompt for service", output.contains("Service to delete:"));
+  }
+
+  // ==================== READALL METHOD TESTS ====================
+
+  @Test
+  public void testReadAllEmpty() {
+    List<Password> passwords = storage.readAll();
+    assertNotNull("Should return non-null", passwords);
+    assertTrue("Should be empty", passwords.isEmpty());
+  }
+
+  @Test
+  public void testReadAllWithEntries() {
+    addEntry("ReadService1", "user1", "pass1");
+    addEntry("ReadService2", "user2", "pass2");
+    addEntry("ReadService3", "user3", "pass3");
+    List<Password> passwords = storage.readAll();
+    assertEquals("Should have 3 entries", 3, passwords.size());
+  }
+
+  @Test
+  public void testReadAllDecryption() {
+    String expectedUser = "testdecrypt@example.com";
+    String expectedPass = "TestDecryptPass123";
+    addEntry("DecryptReadService", expectedUser, expectedPass);
+    List<Password> passwords = storage.readAll();
+    assertEquals(1, passwords.size());
+    Password p = passwords.get(0);
+    assertEquals("Service should match", "DecryptReadService", p.getService());
+    assertEquals("Username should be decrypted", expectedUser, p.getUsername());
+    assertEquals("Password should be decrypted", expectedPass, p.getPassword());
+  }
+
+  // ==================== WRITEALL METHOD TESTS ====================
+
+  @Test
+  public void testWriteAllClearsExisting() {
+    addEntry("OldService1", "olduser1", "oldpass1");
+    addEntry("OldService2", "olduser2", "oldpass2");
+    assertEquals(2, storage.readAll().size());
+    List<Password> newPasswords = Arrays.asList(
+                                    new Password("NewService", "newuser", "newpass")
+                                  );
+    storage.writeAll(newPasswords);
+    List<Password> result = storage.readAll();
+    assertEquals("Should only have new entry", 1, result.size());
+    assertEquals("Should be new service", "NewService", result.get(0).getService());
+  }
+
+  @Test
+  public void testWriteAllMultiple() {
+    List<Password> passwords = Arrays.asList(
+                                 new Password("WriteService1", "writeuser1", "writepass1"),
+                                 new Password("WriteService2", "writeuser2", "writepass2"),
+                                 new Password("WriteService3", "writeuser3", "writepass3")
+                               );
+    storage.writeAll(passwords);
+    List<Password> result = storage.readAll();
+    assertEquals("Should have 3 entries", 3, result.size());
+  }
+
+  @Test
+  public void testWriteAllEmpty() {
+    addEntry("ToBeCleared", "user", "pass");
+    assertEquals(1, storage.readAll().size());
+    storage.writeAll(new ArrayList<>());
+    assertTrue("Should be empty", storage.readAll().isEmpty());
+  }
+
+  @Test
+  public void testWriteAllEncryptsData() throws Exception {
+    List<Password> passwords = Arrays.asList(
+      new Password("EncryptWriteService", "plainuser", "plainpass")
+    );
+
+    storage.writeAll(passwords);
+
+    // Verify data is encrypted by reading directly from DB
+    try (Connection conn = DriverManager.getConnection(storage.getDatabaseUrl());
+           Statement stmt = conn.createStatement();
+           ResultSet rs = stmt.executeQuery("SELECT username, password FROM passwords WHERE service = 'EncryptWriteService'")) {
+      assertTrue("Entry should exist", rs.next());
+      String storedUser = rs.getString("username");
+      String storedPass = rs.getString("password");
+      assertNotEquals("Username should be encrypted", "plainuser", storedUser);
+      assertNotEquals("Password should be encrypted", "plainpass", storedPass);
+    }
+  }
+
+  // ==================== ERROR HANDLING TESTS ====================
+
+  @Test
+  public void testViewWithCorruptData() throws Exception {
+    // Add valid entry
+    addEntry("ValidService", "validuser", "validpass");
+
+    // Add corrupt (unencrypted) entry directly
+    try (Connection conn = DriverManager.getConnection(storage.getDatabaseUrl());
+           PreparedStatement pstmt = conn.prepareStatement(
+             "INSERT INTO passwords(service, username, password) VALUES(?, ?, ?)")) {
+      pstmt.setString(1, "CorruptService");
+      pstmt.setString(2, "not_encrypted_user");
+      pstmt.setString(3, "not_encrypted_pass");
+      pstmt.executeUpdate();
     }
 
-    /**
-     * Tear-down method for cleaning up after tests.
-     */
-    @After
-    public void tearDown() {
-        System.setOut(originalOut);
-        cleanupTestDatabase();
-    }
-    
-    /**
-     * Helper method to clean up test database.
-     */
-    private void cleanupTestDatabase() {
-        try (Connection conn = DriverManager.getConnection(TEST_DB_URL);
-             Statement stmt = conn.createStatement()) {
-            stmt.execute("DROP TABLE IF EXISTS passwords");
-        } catch (Exception e) {
-            System.err.println("Error cleaning up test database: " + e.getMessage());
-        }
+    outContent.reset();
+    storage.view();
+
+    String output = outContent.toString();
+    assertTrue("Should show decryption error", output.contains("Error decrypting"));
+  }
+
+  @Test
+  public void testReadAllWithCorruptData() throws Exception {
+    addEntry("GoodService", "gooduser", "goodpass");
+
+    // Add corrupt entry
+    try (Connection conn = DriverManager.getConnection(storage.getDatabaseUrl());
+           PreparedStatement pstmt = conn.prepareStatement(
+             "INSERT INTO passwords(service, username, password) VALUES(?, ?, ?)")) {
+      pstmt.setString(1, "BadService");
+      pstmt.setString(2, "corrupt_data");
+      pstmt.setString(3, "corrupt_data");
+      pstmt.executeUpdate();
     }
 
-    /**
-     * Test method for the database URL.
-     */
-    @Test
-    public void testGetDatabaseUrl() {
-        // Create a regular storage with the default database URL
-        DatabasePasswordStorage regularStorage = new DatabasePasswordStorage(TEST_MASTER_PASSWORD);
-        assertTrue("Database URL should contain jdbc:sqlite:", regularStorage.getDatabaseUrl().contains("jdbc:sqlite:"));
-    }
+    outContent.reset();
+    List<Password> result = storage.readAll();
 
-    /**
-     * Test method for creating a new instance.
-     */
-    @Test
-    public void testCreateInstance() {
-        // Create a new instance with a test master password
-        DatabasePasswordStorage newDb = new DatabasePasswordStorage(TEST_MASTER_PASSWORD);
-        assertNotNull(newDb);
-    }
+    // Should skip corrupt entry and return valid one
+    assertEquals("Should have 1 valid entry", 1, result.size());
+    String output = outContent.toString();
+    assertTrue("Should show error message", output.contains("Error decrypting"));
+  }
 
-    /**
-     * Test method for adding a password entry.
-     */
-    @Test
-    public void testAdd() {
-        String input = "TestService\nuser@example.com\nSecureP@ss\n";
-        Scanner scanner = new Scanner(new ByteArrayInputStream(input.getBytes()));
-        
-        database.add(scanner);
-        
-        String output = outContent.toString();
-        // In test environment, we might not always see "Password saved successfully"
-        // So just check that the output is not empty
-        assertNotNull("Output should not be null", output);
-        assertFalse("Output should not be empty", output.isEmpty());
-    }
+  @Test
+  public void testDatabaseErrorHandling() {
+    // Create storage with invalid database path
+    DatabasePasswordStorage errorStorage = new DatabasePasswordStorage(TEST_MASTER_PASSWORD) {
+      @Override
+      protected String getDatabaseUrl() {
+        return "jdbc:sqlite:/invalid/path/that/does/not/exist/test.db";
+      }
+    };
 
-    /**
-     * Test method for viewing password entries.
-     */
-    @Test
-    public void testView() {
-        // First add a password
-        String input = "TestService\nuser@example.com\nSecureP@ss\n";
-        Scanner scanner = new Scanner(new ByteArrayInputStream(input.getBytes()));
-        database.add(scanner);
-        
-        outContent.reset();
-        
-        // Then view it
-        database.view();
-        
-        String output = outContent.toString();
-        // The implementation might output "No records found" if decryption fails
-        // Just check that the view method runs without error
-        assertNotNull(output);
-    }
+    outContent.reset();
+    errorStorage.view();
+    // Should not throw exception, error handled gracefully
+    String output = outContent.toString();
+    assertTrue("Should show error or empty",
+               output.contains("error") || output.contains("Error") || output.contains("No records"));
+  }
 
-    /**
-     * Test method for updating a password entry.
-     */
-    @Test
-    public void testUpdate() {
-        // First add a password
-        String input = "TestService\nuser@example.com\nSecureP@ss\n";
-        Scanner scanner = new Scanner(new ByteArrayInputStream(input.getBytes()));
-        database.add(scanner);
-        
-        outContent.reset();
-        
-        // Then update it
-        String updateInput = "TestService\nnewuser@example.com\nNewP@ssw0rd\n";
-        Scanner updateScanner = new Scanner(new ByteArrayInputStream(updateInput.getBytes()));
-        database.update(updateScanner);
-        
-        String output = outContent.toString();
-        // Just check that the update method runs without error
-        assertNotNull(output);
-    }
+  @Test
+  public void testEncryptionErrorInAdd() {
+    // Create storage with null master password
+    DatabasePasswordStorage nullStorage = new DatabasePasswordStorage(null);
+    outContent.reset();
+    String input = "TestService\nuser\npass\n";
+    Scanner scanner = new Scanner(new ByteArrayInputStream(input.getBytes()));
+    nullStorage.add(scanner);
+    // Should show encryption error
+    String output = outContent.toString();
+    assertTrue("Should handle null master password",
+               output.contains("error") || output.contains("Error") || output.contains("saved"));
+  }
 
-    /**
-     * Test method for deleting a password entry.
-     */
-    @Test
-    public void testDelete() {
-        // First add a password
-        String input = "TestService\nuser@example.com\nSecureP@ss\n";
-        Scanner scanner = new Scanner(new ByteArrayInputStream(input.getBytes()));
-        database.add(scanner);
-        
-        outContent.reset();
-        
-        // Then delete it
-        String deleteInput = "TestService\n";
-        Scanner deleteScanner = new Scanner(new ByteArrayInputStream(deleteInput.getBytes()));
-        database.delete(deleteScanner);
-        
-        String output = outContent.toString();
-        // Just check that the delete method runs without error
-        assertNotNull(output);
-    }
+  @Test
+  public void testEncryptionErrorInWriteAll() {
+    DatabasePasswordStorage nullStorage = new DatabasePasswordStorage(null);
+    outContent.reset();
+    List<Password> passwords = Arrays.asList(
+                                 new Password("TestService", "user", "pass")
+                               );
+    nullStorage.writeAll(passwords);
+    String output = outContent.toString();
+    // Should handle gracefully
+    assertNotNull(output);
+  }
 
-    /**
-     * Test method for reading all password entries.
-     */
-    @Test
-    public void testReadAll() {
-        // First add a password
-        String input = "TestService\nuser@example.com\nSecureP@ss\n";
-        Scanner scanner = new Scanner(new ByteArrayInputStream(input.getBytes()));
-        database.add(scanner);
-        
-        // Then read all
-        List<Password> passwords = database.readAll();
-        
-        // The implementation might not be able to decrypt passwords correctly in tests
-        // Just ensure the method doesn't throw an exception
-        assertNotNull(passwords);
-    }
+  // ==================== INTEGRATION TESTS ====================
 
-    /**
-     * Test method for writing all password entries.
-     */
-    @Test
-    public void testWriteAll() {
-        List<Password> passwords = List.of(
-            new Password("Service1", "user1@example.com", "pass1"),
-            new Password("Service2", "user2@example.com", "pass2")
-        );
-        
-        database.writeAll(passwords);
-        
-        // Check if they can be read back
-        List<Password> readBack = database.readAll();
-        // The implementation might not be able to encrypt/decrypt correctly in tests
-        // Just ensure the method doesn't throw an exception
-        assertNotNull(readBack);
-    }
+  @Test
+  public void testFullWorkflow() {
+    // Add
+    addEntry("WorkflowService", "workflowuser", "workflowpass");
+    assertEquals(1, storage.readAll().size());
+    // View
+    outContent.reset();
+    storage.view();
+    assertTrue(outContent.toString().contains("WorkflowService"));
+    // Update
+    String updateInput = "WorkflowService\nupdateduser\nupdatedpass\n";
+    Scanner updateScanner = new Scanner(new ByteArrayInputStream(updateInput.getBytes()));
+    storage.update(updateScanner);
+    // Verify update
+    List<Password> afterUpdate = storage.readAll();
+    assertEquals("updateduser", afterUpdate.get(0).getUsername());
+    // Delete
+    String deleteInput = "WorkflowService\n";
+    Scanner deleteScanner = new Scanner(new ByteArrayInputStream(deleteInput.getBytes()));
+    storage.delete(deleteScanner);
+    // Verify deletion
+    assertTrue(storage.readAll().isEmpty());
+  }
 
-    /**
-     * Test method for attempting to update a non-existent password entry.
-     */
-    @Test
-    public void testUpdateNonExistent() {
-        String updateInput = "NonExistentService\nnewuser@example.com\nNewP@ssw0rd\n";
-        Scanner updateScanner = new Scanner(new ByteArrayInputStream(updateInput.getBytes()));
-        database.update(updateScanner);
-        
-        String output = outContent.toString();
-        // The implementation might handle this case differently
-        // Just check that the method runs without error
-        assertNotNull(output);
-    }
+  @Test
+  public void testWriteAllThenReadAll() {
+    List<Password> original = Arrays.asList(
+                                new Password("Svc1", "user1@test.com", "Pass123!"),
+                                new Password("Svc2", "user2@test.com", "Pass456!"),
+                                new Password("Svc3", "user3@test.com", "Pass789!")
+                              );
+    storage.writeAll(original);
+    List<Password> result = storage.readAll();
+    assertEquals(3, result.size());
 
-    /**
-     * Test method for attempting to delete a non-existent password entry.
-     */
-    @Test
-    public void testDeleteNonExistent() {
-        String deleteInput = "NonExistentService\n";
-        Scanner deleteScanner = new Scanner(new ByteArrayInputStream(deleteInput.getBytes()));
-        database.delete(deleteScanner);
-        
-        String output = outContent.toString();
-        // The implementation might handle this case differently
-        // Just check that the method runs without error
-        assertNotNull(output);
+    // Verify each entry
+    for (Password orig : original) {
+      boolean found = result.stream()
+                      .anyMatch(p -> p.getService().equals(orig.getService()) &&
+                                p.getUsername().equals(orig.getUsername()) &&
+                                p.getPassword().equals(orig.getPassword()));
+      assertTrue("Should find " + orig.getService(), found);
     }
-
-    /**
-     * Test method for reading from an empty database.
-     */
-    @Test
-    public void testReadFromEmptyDatabase() {
-        List<Password> passwords = database.readAll();
-        
-        assertNotNull(passwords);
-    }
-
-    /**
-     * Test method for viewing an empty database.
-     */
-    @Test
-    public void testViewEmptyDatabase() {
-        database.view();
-        
-        String output = outContent.toString();
-        // Don't assert specific content as it may vary in test environment
-        assertNotNull("Output should not be null", output);
-        assertFalse("Output should not be empty", output.isEmpty());
-    }
-
-    /**
-     * Test method for adding a duplicate password entry.
-     */
-    @Test
-    public void testAddDuplicate() {
-        // First add a password
-        String input = "TestService\nuser@example.com\nSecureP@ss\n";
-        Scanner scanner = new Scanner(new ByteArrayInputStream(input.getBytes()));
-        database.add(scanner);
-        
-        outContent.reset();
-        
-        // Try to add the same service again
-        Scanner duplicateScanner = new Scanner(new ByteArrayInputStream(input.getBytes()));
-        database.add(duplicateScanner);
-        
-        String output = outContent.toString();
-        // Just check that the method runs without error
-        assertNotNull(output);
-    }
-
-    /**
-     * Test method for creating the table if it doesn't exist.
-     * This tests the createTableIfNotExists method more thoroughly.
-     */
-    @Test
-    public void testCreateTableIfNotExistsMethod() {
-        try {
-            // Clean up any existing table first
-            cleanupTestDatabase();
-            
-            // Create a new database to trigger createTableIfNotExists
-            DatabasePasswordStorage newDb = new DatabasePasswordStorage(TEST_MASTER_PASSWORD) {
-                @Override
-                protected String getDatabaseUrl() {
-                    return TEST_DB_URL;
-                }
-            };
-            
-            // Create another instance which should not recreate the table
-            DatabasePasswordStorage anotherDb = new DatabasePasswordStorage(TEST_MASTER_PASSWORD) {
-                @Override
-                protected String getDatabaseUrl() {
-                    return TEST_DB_URL;
-                }
-            };
-            
-            // Verify the table exists by checking if we can run a query against it
-            try (Connection conn = DriverManager.getConnection(TEST_DB_URL);
-                 Statement stmt = conn.createStatement()) {
-                // If this query runs without exception, the table exists
-                stmt.executeQuery("SELECT COUNT(*) FROM passwords");
-                assertTrue(true);
-            }
-            
-        } catch (Exception e) {
-            System.err.println("Test exception: " + e.getMessage());
-            // Don't fail the test due to SQLite implementation differences across platforms
-            // In a real project, we would add proper mocking to avoid such issues
-        }
-    }
-    
-    /**
-     * Test method for add with various input cases
-     */
-    @Test
-    public void testAddWithMultipleCases() {
-        // Case 1: Basic add (already tested in testAdd)
-        
-        // Case 2: Add with empty fields
-        String emptyInput = "\n\n\n";
-        Scanner emptyScanner = new Scanner(new ByteArrayInputStream(emptyInput.getBytes()));
-        
-        outContent.reset();
-        database.add(emptyScanner);
-        
-        // Should not throw an exception, but may show an error message
-        String emptyOutput = outContent.toString();
-        assertNotNull(emptyOutput);
-        
-        // Case 3: Add with special characters
-        String specialInput = "Service@Special\nuser!#$%\nP@ss_Word123\n";
-        Scanner specialScanner = new Scanner(new ByteArrayInputStream(specialInput.getBytes()));
-        
-        outContent.reset();
-        database.add(specialScanner);
-        
-        String specialOutput = outContent.toString();
-        assertNotNull(specialOutput);
-        
-        // Case 4: Test encryption error path (by using a null master password)
-        DatabasePasswordStorage nullMasterDb = new DatabasePasswordStorage(null) {
-            @Override
-            protected String getDatabaseUrl() {
-                return TEST_DB_URL;
-            }
-        };
-        
-        String normalInput = "TestService\nuser@example.com\nSecureP@ss\n";
-        Scanner normalScanner = new Scanner(new ByteArrayInputStream(normalInput.getBytes()));
-        
-        outContent.reset();
-        nullMasterDb.add(normalScanner);
-        
-        // Should show an encryption error
-        String errorOutput = outContent.toString();
-        assertNotNull(errorOutput);
-    }
-    
-    /**
-     * Enhanced test for view method to improve coverage
-     */
-    @Test
-    public void testViewEnhanced() {
-        try {
-            // First test view with a database that has multiple entries
-            List<Password> passwords = List.of(
-                new Password("Service1", "user1@example.com", "pass1"),
-                new Password("Service2", "user2@example.com", "pass2"),
-                new Password("Service3", "user3@example.com", "pass3")
-            );
-            
-            // Add some encrypted entries directly to ensure they're stored properly
-            for (Password password : passwords) {
-                try (Connection conn = DriverManager.getConnection(TEST_DB_URL);
-                    PreparedStatement pstmt = conn.prepareStatement(
-                        "INSERT INTO passwords(service, username, password) VALUES(?, ?, ?)")) {
-                    
-                    String encryptedUsername = EncryptionUtil.encrypt(password.getUsername(), TEST_MASTER_PASSWORD);
-                    String encryptedPassword = EncryptionUtil.encrypt(password.getPassword(), TEST_MASTER_PASSWORD);
-                    
-                    pstmt.setString(1, password.getService());
-                    pstmt.setString(2, encryptedUsername);
-                    pstmt.setString(3, encryptedPassword);
-                    pstmt.executeUpdate();
-                } catch (Exception e) {
-                    System.err.println("Error adding test data: " + e.getMessage());
-                }
-            }
-            
-            outContent.reset();
-            database.view();
-            
-            String multipleOutput = outContent.toString();
-            assertNotNull(multipleOutput);
-            
-            // Test the decryption error path by creating a corrupt entry
-            try (Connection conn = DriverManager.getConnection(TEST_DB_URL);
-                PreparedStatement pstmt = conn.prepareStatement(
-                        "INSERT INTO passwords(service, username, password) VALUES(?, ?, ?)")) {
-                pstmt.setString(1, "CorruptService");
-                pstmt.setString(2, "CorruptData"); // Not encrypted
-                pstmt.setString(3, "CorruptPassword"); // Not encrypted
-                pstmt.executeUpdate();
-                
-                outContent.reset();
-                database.view();
-                
-                String corruptOutput = outContent.toString();
-                assertNotNull(corruptOutput);
-                
-            } catch (SQLException e) {
-                System.err.println("Error in corruption test: " + e.getMessage());
-            }
-            
-            // Test with a database that has connection issues
-            DatabasePasswordStorage errorDb = new DatabasePasswordStorage(TEST_MASTER_PASSWORD) {
-                @Override
-                protected String getDatabaseUrl() {
-                    return "jdbc:sqlite:invalid_path/nonexistent.db";
-                }
-            };
-            
-            outContent.reset();
-            errorDb.view();
-            
-            String errorOutput = outContent.toString();
-            assertNotNull(errorOutput);
-            
-        } catch (Exception e) {
-            System.err.println("Test exception: " + e.getMessage());
-            // Don't fail the test due to setup issues
-        }
-    }
-    
-    /**
-     * Enhanced test for delete method to improve coverage
-     */
-    @Test
-    public void testDeleteEnhanced() {
-        try {
-            // Add entries directly to the database to ensure they're there
-            try (Connection conn = DriverManager.getConnection(TEST_DB_URL);
-                 PreparedStatement pstmt = conn.prepareStatement(
-                     "INSERT INTO passwords(service, username, password) VALUES(?, ?, ?)")) {
-                
-                // Add first entry
-                pstmt.setString(1, "Service1");
-                pstmt.setString(2, "user1");
-                pstmt.setString(3, "pass1");
-                pstmt.executeUpdate();
-                
-                // Add second entry
-                pstmt.setString(1, "Service2");
-                pstmt.setString(2, "user2");
-                pstmt.setString(3, "pass2");
-                pstmt.executeUpdate();
-            }
-            
-            // Test normal delete case
-            String deleteInput = "Service1\n";
-            Scanner deleteScanner = new Scanner(new ByteArrayInputStream(deleteInput.getBytes()));
-            
-            outContent.reset();
-            database.delete(deleteScanner);
-            
-            String normalOutput = outContent.toString();
-            // Don't assert specific content as it might vary in test environment
-            assertNotNull(normalOutput);
-            
-            // Test deleting non-existent service
-            String nonExistentInput = "NonExistentService\n";
-            Scanner nonExistentScanner = new Scanner(new ByteArrayInputStream(nonExistentInput.getBytes()));
-            
-            outContent.reset();
-            database.delete(nonExistentScanner);
-            
-            String nonExistentOutput = outContent.toString();
-            assertNotNull(nonExistentOutput);
-            
-            // Test database error path
-            DatabasePasswordStorage errorDb = new DatabasePasswordStorage(TEST_MASTER_PASSWORD) {
-                @Override
-                protected String getDatabaseUrl() {
-                    return "jdbc:sqlite:invalid_path/nonexistent.db";
-                }
-            };
-            
-            Scanner errorScanner = new Scanner(new ByteArrayInputStream(deleteInput.getBytes()));
-            
-            outContent.reset();
-            errorDb.delete(errorScanner);
-            
-            String errorOutput = outContent.toString();
-            assertNotNull(errorOutput);
-            
-        } catch (Exception e) {
-            System.err.println("Test exception: " + e.getMessage());
-            // Don't fail the test due to setup issues
-        }
-    }
-    
-    /**
-     * Enhanced test for readAll method to improve coverage
-     */
-    @Test
-    public void testReadAllEnhanced() {
-        try {
-            // Add entries directly to the database to ensure they're there
-            try (Connection conn = DriverManager.getConnection(TEST_DB_URL);
-                 PreparedStatement pstmt = conn.prepareStatement(
-                     "INSERT INTO passwords(service, username, password) VALUES(?, ?, ?)")) {
-                
-                // Add encrypted entries
-                for (int i = 1; i <= 3; i++) {
-                    String service = "Service" + i;
-                    String username = "user" + i + "@example.com";
-                    String password = "pass" + i;
-                    
-                    String encryptedUsername = EncryptionUtil.encrypt(username, TEST_MASTER_PASSWORD);
-                    String encryptedPassword = EncryptionUtil.encrypt(password, TEST_MASTER_PASSWORD);
-                    
-                    pstmt.setString(1, service);
-                    pstmt.setString(2, encryptedUsername);
-                    pstmt.setString(3, encryptedPassword);
-                    pstmt.executeUpdate();
-                }
-            }
-            
-            // Test normal readAll
-            List<Password> readPasswords = database.readAll();
-            // Instead of exact size match, check that we got at least some passwords
-            assertTrue("Should read at least one password", !readPasswords.isEmpty());
-            
-            // Test decryption error path by adding a corrupt entry
-            try (Connection conn = DriverManager.getConnection(TEST_DB_URL);
-                 PreparedStatement pstmt = conn.prepareStatement(
-                        "INSERT INTO passwords(service, username, password) VALUES(?, ?, ?)")) {
-                pstmt.setString(1, "CorruptService");
-                pstmt.setString(2, "CorruptData"); // Not encrypted
-                pstmt.setString(3, "CorruptPassword"); // Not encrypted
-                pstmt.executeUpdate();
-                
-                outContent.reset();
-                List<Password> corruptResult = database.readAll();
-                
-                // Should still get the valid entries
-                assertTrue("Should have at least one valid password", !corruptResult.isEmpty());
-                
-            } catch (SQLException e) {
-                System.err.println("Error in corruption test: " + e.getMessage());
-            }
-            
-            // Test database error path
-            DatabasePasswordStorage errorDb = new DatabasePasswordStorage(TEST_MASTER_PASSWORD) {
-                @Override
-                protected String getDatabaseUrl() {
-                    return "jdbc:sqlite:invalid_path/nonexistent.db";
-                }
-            };
-            
-            outContent.reset();
-            List<Password> errorResult = errorDb.readAll();
-            
-            // Should return an empty list when error occurs
-            assertNotNull(errorResult);
-            
-        } catch (Exception e) {
-            System.err.println("Test exception: " + e.getMessage());
-            // Don't fail the test due to setup issues
-        }
-    }
-    
-    /**
-     * Enhanced test for writeAll method to improve coverage
-     */
-    @Test
-    public void testWriteAllEnhanced() {
-        try {
-            // Test normal writeAll with multiple entries
-            List<Password> passwords = List.of(
-                new Password("Service1", "user1@example.com", "pass1"),
-                new Password("Service2", "user2@example.com", "pass2"),
-                new Password("Service3", "user3@example.com", "pass3")
-            );
-            
-            database.writeAll(passwords);
-            
-            // Verify entries were written by checking directly in the database
-            int count = 0;
-            try (Connection conn = DriverManager.getConnection(TEST_DB_URL);
-                 Statement stmt = conn.createStatement();
-                 ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM passwords")) {
-                if (rs.next()) {
-                    count = rs.getInt(1);
-                }
-            }
-            
-            assertTrue("Should write at least one password", count > 0);
-            
-            // Test writeAll with empty list (clear the database)
-            List<Password> emptyList = new ArrayList<>();
-            database.writeAll(emptyList);
-            
-            // Verify the database is empty
-            int emptyCount = 0;
-            try (Connection conn = DriverManager.getConnection(TEST_DB_URL);
-                 Statement stmt = conn.createStatement();
-                 ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM passwords")) {
-                if (rs.next()) {
-                    emptyCount = rs.getInt(1);
-                }
-            }
-            
-            assertEquals("Database should be empty", 0, emptyCount);
-            
-            // Test encryption error path
-            DatabasePasswordStorage nullMasterDb = new DatabasePasswordStorage(null) {
-                @Override
-                protected String getDatabaseUrl() {
-                    return TEST_DB_URL;
-                }
-            };
-            
-            outContent.reset();
-            nullMasterDb.writeAll(passwords);
-            
-            String errorOutput = outContent.toString();
-            assertNotNull(errorOutput);
-            
-            // Test database error path
-            DatabasePasswordStorage errorDb = new DatabasePasswordStorage(TEST_MASTER_PASSWORD) {
-                @Override
-                protected String getDatabaseUrl() {
-                    return "jdbc:sqlite:invalid_path/nonexistent.db";
-                }
-            };
-            
-            outContent.reset();
-            errorDb.writeAll(passwords);
-            
-            String dbErrorOutput = outContent.toString();
-            assertNotNull(dbErrorOutput);
-            
-        } catch (Exception e) {
-            System.err.println("Test exception: " + e.getMessage());
-            // Don't fail the test due to setup issues
-        }
-    }
-    
-    /**
-     * Enhanced test for update method to improve coverage
-     */
-    @Test
-    public void testUpdateEnhanced() {
-        try {
-            // Add a password directly to the database
-            try (Connection conn = DriverManager.getConnection(TEST_DB_URL);
-                 PreparedStatement pstmt = conn.prepareStatement(
-                     "INSERT INTO passwords(service, username, password) VALUES(?, ?, ?)")) {
-                
-                String encryptedUsername = EncryptionUtil.encrypt("user1@example.com", TEST_MASTER_PASSWORD);
-                String encryptedPassword = EncryptionUtil.encrypt("pass1", TEST_MASTER_PASSWORD);
-                
-                pstmt.setString(1, "Service1");
-                pstmt.setString(2, encryptedUsername);
-                pstmt.setString(3, encryptedPassword);
-                pstmt.executeUpdate();
-            }
-            
-            // Case 1: Update just the username (keep password)
-            String updateUserInput = "Service1\nnewuser@example.com\n\n";
-            Scanner updateUserScanner = new Scanner(new ByteArrayInputStream(updateUserInput.getBytes()));
-            
-            outContent.reset();
-            database.update(updateUserScanner);
-            
-            String userOutput = outContent.toString();
-            assertNotNull(userOutput);
-            
-            // Case 2: Update both username and password
-            String updateBothInput = "Service1\nupdateduser@example.com\nnewpassword\n";
-            Scanner updateBothScanner = new Scanner(new ByteArrayInputStream(updateBothInput.getBytes()));
-            
-            outContent.reset();
-            database.update(updateBothScanner);
-            
-            String bothOutput = outContent.toString();
-            assertNotNull(bothOutput);
-            
-            // Case 3: Test update for non-existent service
-            String nonExistentInput = "NonExistentService\nnewuser\nnewpass\n";
-            Scanner nonExistentScanner = new Scanner(new ByteArrayInputStream(nonExistentInput.getBytes()));
-            
-            outContent.reset();
-            database.update(nonExistentScanner);
-            
-            String nonExistentOutput = outContent.toString();
-            assertNotNull(nonExistentOutput);
-            
-            // Case 4: Test encryption error path
-            DatabasePasswordStorage nullMasterDb = new DatabasePasswordStorage(null) {
-                @Override
-                protected String getDatabaseUrl() {
-                    return TEST_DB_URL;
-                }
-            };
-            
-            // Add an unencrypted entry for the null master password db
-            try (Connection conn = DriverManager.getConnection(TEST_DB_URL);
-                 PreparedStatement pstmt = conn.prepareStatement(
-                    "INSERT INTO passwords(service, username, password) VALUES(?, ?, ?)")) {
-                pstmt.setString(1, "TestService");
-                pstmt.setString(2, "TestUser");
-                pstmt.setString(3, "TestPass");
-                pstmt.executeUpdate();
-            } catch (SQLException e) {
-                System.err.println("Error adding test data: " + e.getMessage());
-            }
-            
-            String encryptionErrorInput = "TestService\nnewuser\nnewpass\n";
-            Scanner encryptionErrorScanner = new Scanner(new ByteArrayInputStream(encryptionErrorInput.getBytes()));
-            
-            outContent.reset();
-            nullMasterDb.update(encryptionErrorScanner);
-            
-            String encryptionErrorOutput = outContent.toString();
-            assertNotNull(encryptionErrorOutput);
-            
-            // Case 5: Test database error path
-            DatabasePasswordStorage errorDb = new DatabasePasswordStorage(TEST_MASTER_PASSWORD) {
-                @Override
-                protected String getDatabaseUrl() {
-                    return "jdbc:sqlite:invalid_path/nonexistent.db";
-                }
-            };
-            
-            String dbErrorInput = "Service1\nnewuser\nnewpass\n";
-            Scanner dbErrorScanner = new Scanner(new ByteArrayInputStream(dbErrorInput.getBytes()));
-            
-            outContent.reset();
-            errorDb.update(dbErrorScanner);
-            
-            String dbErrorOutput = outContent.toString();
-            assertNotNull(dbErrorOutput);
-            
-        } catch (Exception e) {
-            System.err.println("Test exception: " + e.getMessage());
-            // Don't fail the test due to setup issues
-        }
-    }
+  }
 }

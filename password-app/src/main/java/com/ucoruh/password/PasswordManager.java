@@ -6,10 +6,15 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Scanner;
+import java.util.Set;
+import java.util.Stack;
 import java.util.stream.Collectors;
 
 /**
@@ -49,9 +54,19 @@ public class PasswordManager {
   private final CommandStack undoStack;
 
   /**
+   * @brief Service dependency graph.
+   */
+  private final ServiceGraph serviceGraph;
+
+  /**
    * @brief Redo stack for command pattern.
    */
   private final CommandStack redoStack;
+
+  /**
+   * @brief Pending operations queue.
+   */
+  private final PendingOperationsQueue operationsQueue;
 
   /**
    * @brief Constructor initializing the manager with a master password.
@@ -67,6 +82,8 @@ public class PasswordManager {
     this.accessMatrix = new AccessMatrix();
     this.undoStack = new CommandStack();
     this.redoStack = new CommandStack();
+    this.serviceGraph = new ServiceGraph();
+    this.operationsQueue = new PendingOperationsQueue();
     loadCredentials();
   }
 
@@ -83,6 +100,8 @@ public class PasswordManager {
     this.accessMatrix = new AccessMatrix();
     this.undoStack = new CommandStack();
     this.redoStack = new CommandStack();
+    this.serviceGraph = new ServiceGraph();
+    this.operationsQueue = new PendingOperationsQueue();
     loadCredentials();
   }
 
@@ -1129,6 +1148,488 @@ public class PasswordManager {
     public void clear() {
       top = null;
       size = 0;
+    }
+  }
+
+  // ========== SERVICE DEPENDENCY GRAPH (BFS, DFS, SCC) ==========
+
+  /**
+   * @brief Graph data structure for tracking service dependencies.
+   * @details Implements directed graph with BFS, DFS, and Strongly Connected Components (Kosaraju's algorithm).
+   *
+   * Time Complexity:
+   * - addEdge: O(1)
+   * - BFS: O(V + E)
+   * - DFS: O(V + E)
+   * - SCC: O(V + E)
+   *
+   * Space Complexity: O(V + E)
+   */
+  public static class ServiceGraph {
+    private final Map<String, List<String>> adjacencyList;
+    private final Map<String, List<String>> reverseAdjacencyList;
+
+    /**
+     * @brief Constructor initializes empty graph.
+     */
+    public ServiceGraph() {
+      this.adjacencyList = new HashMap<>();
+      this.reverseAdjacencyList = new HashMap<>();
+    }
+
+    /**
+     * @brief Adds a directed edge from service1 to service2.
+     * @details Represents that service1 depends on service2.
+     *
+     * @param service1 Source service
+     * @param service2 Destination service
+     */
+    public void addEdge(String service1, String service2) {
+      adjacencyList.putIfAbsent(service1, new ArrayList<>());
+      adjacencyList.putIfAbsent(service2, new ArrayList<>());
+      adjacencyList.get(service1).add(service2);
+      // Build reverse graph for SCC
+      reverseAdjacencyList.putIfAbsent(service1, new ArrayList<>());
+      reverseAdjacencyList.putIfAbsent(service2, new ArrayList<>());
+      reverseAdjacencyList.get(service2).add(service1);
+    }
+
+    /**
+     * @brief Breadth-First Search traversal starting from a service.
+     * @details Returns list of services reachable from start in BFS order.
+     *
+     * Time Complexity: O(V + E)
+     * Space Complexity: O(V)
+     *
+     * @param start Starting service
+     * @return List of services in BFS order
+     */
+    public List<String> bfs(String start) {
+      if (!adjacencyList.containsKey(start)) {
+        return new ArrayList<>();
+      }
+
+      List<String> result = new ArrayList<>();
+      Set<String> visited = new HashSet<>();
+      Queue<String> queue = new LinkedList<>();
+      queue.offer(start);
+      visited.add(start);
+
+      while (!queue.isEmpty()) {
+        String current = queue.poll();
+        result.add(current);
+        List<String> neighbors = adjacencyList.get(current);
+
+        if (neighbors != null) {
+          for (String neighbor : neighbors) {
+            if (!visited.contains(neighbor)) {
+              visited.add(neighbor);
+              queue.offer(neighbor);
+            }
+          }
+        }
+      }
+
+      return result;
+    }
+
+    /**
+     * @brief Depth-First Search traversal starting from a service.
+     * @details Returns list of services reachable from start in DFS order.
+     *
+     * Time Complexity: O(V + E)
+     * Space Complexity: O(V)
+     *
+     * @param start Starting service
+     * @return List of services in DFS order
+     */
+    public List<String> dfs(String start) {
+      if (!adjacencyList.containsKey(start)) {
+        return new ArrayList<>();
+      }
+
+      List<String> result = new ArrayList<>();
+      Set<String> visited = new HashSet<>();
+      dfsHelper(start, visited, result);
+      return result;
+    }
+
+    /**
+     * @brief Helper method for DFS traversal.
+     *
+     * @param current Current service being visited
+     * @param visited Set of visited services
+     * @param result List to store DFS order
+     */
+    private void dfsHelper(String current, Set<String> visited, List<String> result) {
+      visited.add(current);
+      result.add(current);
+      List<String> neighbors = adjacencyList.get(current);
+
+      if (neighbors != null) {
+        for (String neighbor : neighbors) {
+          if (!visited.contains(neighbor)) {
+            dfsHelper(neighbor, visited, result);
+          }
+        }
+      }
+    }
+
+    /**
+     * @brief Finds all Strongly Connected Components using Kosaraju's algorithm.
+     * @details A SCC is a maximal set of vertices where each vertex is reachable from every other.
+     *
+     * Algorithm:
+     * 1. Perform DFS on original graph to get finish times
+     * 2. Perform DFS on reversed graph in decreasing finish time order
+     * 3. Each DFS tree in step 2 is a SCC
+     *
+     * Time Complexity: O(V + E)
+     * Space Complexity: O(V)
+     *
+     * @return List of SCCs, each SCC is a list of services
+     */
+    public List<List<String>> findStronglyConnectedComponents() {
+      List<List<String>> sccs = new ArrayList<>();
+      // Step 1: Get finish times using DFS
+      Stack<String> finishStack = new Stack<>();
+      Set<String> visited = new HashSet<>();
+
+      for (String service : adjacencyList.keySet()) {
+        if (!visited.contains(service)) {
+          fillFinishStack(service, visited, finishStack);
+        }
+      }
+
+      // Step 2: Process vertices in decreasing finish time order on reversed graph
+      visited.clear();
+
+      while (!finishStack.isEmpty()) {
+        String service = finishStack.pop();
+
+        if (!visited.contains(service)) {
+          List<String> scc = new ArrayList<>();
+          dfsReverse(service, visited, scc);
+          sccs.add(scc);
+        }
+      }
+
+      return sccs;
+    }
+
+    /**
+     * @brief Fills stack with services in order of finish time.
+     *
+     * @param current Current service
+     * @param visited Set of visited services
+     * @param finishStack Stack to store finish order
+     */
+    private void fillFinishStack(String current, Set<String> visited, Stack<String> finishStack) {
+      visited.add(current);
+      List<String> neighbors = adjacencyList.get(current);
+
+      if (neighbors != null) {
+        for (String neighbor : neighbors) {
+          if (!visited.contains(neighbor)) {
+            fillFinishStack(neighbor, visited, finishStack);
+          }
+        }
+      }
+
+      finishStack.push(current);
+    }
+
+    /**
+     * @brief DFS on reversed graph to find a SCC.
+     *
+     * @param current Current service
+     * @param visited Set of visited services
+     * @param scc List to store current SCC
+     */
+    private void dfsReverse(String current, Set<String> visited, List<String> scc) {
+      visited.add(current);
+      scc.add(current);
+      List<String> neighbors = reverseAdjacencyList.get(current);
+
+      if (neighbors != null) {
+        for (String neighbor : neighbors) {
+          if (!visited.contains(neighbor)) {
+            dfsReverse(neighbor, visited, scc);
+          }
+        }
+      }
+    }
+
+    /**
+     * @brief Gets all services in the graph.
+     *
+     * @return Set of all service names
+     */
+    public Set<String> getAllServices() {
+      return new HashSet<>(adjacencyList.keySet());
+    }
+
+    /**
+     * @brief Gets neighbors of a service.
+     *
+     * @param service Service name
+     * @return List of neighboring services
+     */
+    public List<String> getNeighbors(String service) {
+      List<String> neighbors = adjacencyList.get(service);
+      return neighbors != null ? new ArrayList<>(neighbors) : new ArrayList<>();
+    }
+
+    /**
+     * @brief Checks if graph contains a service.
+     *
+     * @param service Service name
+     * @return true if service exists in graph
+     */
+    public boolean containsService(String service) {
+      return adjacencyList.containsKey(service);
+    }
+
+    /**
+     * @brief Clears the graph.
+     */
+    public void clear() {
+      adjacencyList.clear();
+      reverseAdjacencyList.clear();
+    }
+  }
+
+  /**
+   * @brief Analyzes service dependencies and returns related services.
+   * @details Uses BFS to find all services reachable from the given service.
+   *
+   * @param service Service name
+   * @return List of related services
+   */
+  public List<String> getRelatedServices(String service) {
+    return serviceGraph.bfs(service);
+  }
+
+  /**
+   * @brief Adds a dependency relationship between two services.
+   *
+   * @param service1 Source service
+   * @param service2 Dependent service
+   */
+  public void addServiceDependency(String service1, String service2) {
+    serviceGraph.addEdge(service1, service2);
+  }
+
+  /**
+   * @brief Gets all strongly connected components in service dependencies.
+   *
+   * @return List of SCCs
+   */
+  public List<List<String>> getServiceClusters() {
+    return serviceGraph.findStronglyConnectedComponents();
+  }
+
+  /**
+   * @brief Gets the service dependency graph.
+   *
+   * @return ServiceGraph instance
+   */
+  public ServiceGraph getServiceGraph() {
+    return serviceGraph;
+  }
+
+  /**
+   * @brief Queues a pending operation.
+   *
+   * @param operation Operation description
+   */
+  public void queueOperation(String operation) {
+    operationsQueue.enqueue(operation);
+  }
+
+  /**
+   * @brief Processes all pending operations.
+   *
+   * @return List of processed operations
+   */
+  public List<String> processPendingOperations() {
+    List<String> processed = new ArrayList<>();
+
+    while (!operationsQueue.isEmpty()) {
+      processed.add(operationsQueue.dequeue());
+    }
+
+    return processed;
+  }
+
+  /**
+   * @brief Gets the count of pending operations.
+   *
+   * @return Number of pending operations
+   */
+  public int getPendingOperationsCount() {
+    return operationsQueue.size();
+  }
+
+  /**
+   * @brief Peeks at the next pending operation without removing it.
+   *
+   * @return Next operation or null if queue is empty
+   */
+  public String peekNextOperation() {
+    return operationsQueue.peek();
+  }
+
+  /**
+   * @brief Gets the pending operations queue.
+   *
+   * @return PendingOperationsQueue instance
+   */
+  public PendingOperationsQueue getOperationsQueue() {
+    return operationsQueue;
+  }
+
+  /**
+   * @brief Custom Queue implementation using linked nodes.
+   *
+   * Implements FIFO (First-In-First-Out) data structure for pending operations.
+   */
+  public static class PendingOperationsQueue {
+    /**
+     * @brief Node class for queue elements.
+     */
+    private static class Node {
+      String operation;
+      Node next;
+
+      Node(String operation) {
+        this.operation = operation;
+        this.next = null;
+      }
+    }
+
+    private Node front;  // Front of queue (dequeue from here)
+    private Node rear;   // Rear of queue (enqueue to here)
+    private int size;
+
+    /**
+     * @brief Constructor initializing empty queue.
+     */
+    public PendingOperationsQueue() {
+      this.front = null;
+      this.rear = null;
+      this.size = 0;
+    }
+
+    /**
+     * @brief Adds an operation to the rear of the queue.
+     *
+     * Time complexity: O(1)
+     *
+     * @param operation Operation to enqueue
+     */
+    public void enqueue(String operation) {
+      Node newNode = new Node(operation);
+
+      if (isEmpty()) {
+        front = newNode;
+        rear = newNode;
+      } else {
+        rear.next = newNode;
+        rear = newNode;
+      }
+
+      size++;
+    }
+
+    /**
+     * @brief Removes and returns the operation from the front of the queue.
+     *
+     * Time complexity: O(1)
+     *
+     * @return Front operation, or null if queue is empty
+     */
+    public String dequeue() {
+      if (isEmpty()) {
+        return null;
+      }
+
+      String operation = front.operation;
+      front = front.next;
+
+      if (front == null) {
+        rear = null;  // Queue is now empty
+      }
+
+      size--;
+      return operation;
+    }
+
+    /**
+     * @brief Returns the operation at the front without removing it.
+     *
+     * Time complexity: O(1)
+     *
+     * @return Front operation, or null if queue is empty
+     */
+    public String peek() {
+      if (isEmpty()) {
+        return null;
+      }
+
+      return front.operation;
+    }
+
+    /**
+     * @brief Checks if the queue is empty.
+     *
+     * Time complexity: O(1)
+     *
+     * @return true if queue is empty, false otherwise
+     */
+    public boolean isEmpty() {
+      return size == 0;
+    }
+
+    /**
+     * @brief Gets the current size of the queue.
+     *
+     * Time complexity: O(1)
+     *
+     * @return Number of operations in the queue
+     */
+    public int size() {
+      return size;
+    }
+
+    /**
+     * @brief Clears all operations from the queue.
+     *
+     * Time complexity: O(1)
+     */
+    public void clear() {
+      front = null;
+      rear = null;
+      size = 0;
+    }
+
+    /**
+     * @brief Gets all operations as a list without removing them.
+     *
+     * Time complexity: O(n)
+     *
+     * @return List of all operations in FIFO order
+     */
+    public List<String> toList() {
+      List<String> operations = new ArrayList<>();
+      Node current = front;
+
+      while (current != null) {
+        operations.add(current.operation);
+        current = current.next;
+      }
+
+      return operations;
     }
   }
 }
