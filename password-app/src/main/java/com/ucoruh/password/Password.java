@@ -1,10 +1,6 @@
-package com.ucoruh.password;
-
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * @file Password.java
+ * @package com.ucoruh.password
  * @class Password
  * @brief Represents a stored password entry for a specific service.
  * @author Password Manager Team
@@ -16,6 +12,14 @@ import java.util.List;
  *
  * Additionally, this class maintains a history of previous passwords using
  * a doubly linked list data structure for efficient insertion and traversal.
+ */
+package com.ucoruh.password;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * @brief Represents a stored password entry for a specific service.
  */
 public class Password {
   /**

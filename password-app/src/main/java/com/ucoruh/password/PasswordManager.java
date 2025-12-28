@@ -1,3 +1,14 @@
+/**
+ * @file PasswordManager.java
+ * @package com.ucoruh.password
+ * @class PasswordManager
+ * @brief Main class for the Password Manager application.
+ * @author Password Manager Team
+ * @version 1.0
+ *
+ * Manages secure storage and retrieval of credentials using a master password.
+ * Includes advanced data structures: Sparse Matrix for access pattern tracking.
+ */
 package com.ucoruh.password;
 
 import java.io.PrintStream;
@@ -18,14 +29,7 @@ import java.util.Stack;
 import java.util.stream.Collectors;
 
 /**
- * @file PasswordManager.java
- * @class PasswordManager
  * @brief Main class for the Password Manager application.
- * @author Password Manager Team
- * @version 1.0
- *
- * Manages secure storage and retrieval of credentials using a master password.
- * Includes advanced data structures: Sparse Matrix for access pattern tracking.
  */
 public class PasswordManager {
   /**

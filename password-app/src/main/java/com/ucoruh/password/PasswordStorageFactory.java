@@ -1,7 +1,6 @@
-package com.ucoruh.password;
-
 /**
  * @file PasswordStorageFactory.java
+ * @package com.ucoruh.password
  * @class PasswordStorageFactory
  * @brief Factory class to create password storage implementations.
  * @author Password Manager Team
@@ -10,6 +9,11 @@ package com.ucoruh.password;
  * This class provides a static factory method to return an appropriate instance of
  * InterfacePasswordStorage based on the provided storage type. It supports different
  * storage implementations such as file-based storage and SQLite-based storage.
+ */
+package com.ucoruh.password;
+
+/**
+ * @brief Factory class to create password storage implementations.
  */
 public class PasswordStorageFactory {
 

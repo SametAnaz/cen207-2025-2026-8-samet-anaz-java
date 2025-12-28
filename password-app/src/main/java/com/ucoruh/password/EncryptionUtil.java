@@ -1,3 +1,13 @@
+/**
+ * @file EncryptionUtil.java
+ * @package com.ucoruh.password
+ * @class EncryptionUtil
+ * @brief Utility class for encryption and decryption operations.
+ * @author Password Manager Team
+ * @version 1.0
+ * @details This class provides methods to securely encrypt and decrypt sensitive information
+ * like passwords using AES encryption with a key derived from the master password.
+ */
 package com.ucoruh.password;
 
 import java.nio.charset.StandardCharsets;
@@ -8,13 +18,7 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
 
 /**
- * @file EncryptionUtil.java
- * @class EncryptionUtil
- * @brief Utility class for encryption and decryption operations
- * @author Password Manager Team
- * @version 1.0
- * @details This class provides methods to securely encrypt and decrypt sensitive information
- * like passwords using AES encryption with a key derived from the master password.
+ * @brief Utility class for encryption and decryption operations.
  */
 public class EncryptionUtil {
   /**

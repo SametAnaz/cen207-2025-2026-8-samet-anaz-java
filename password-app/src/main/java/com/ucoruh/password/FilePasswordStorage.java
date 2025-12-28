@@ -1,10 +1,6 @@
-package com.ucoruh.password;
-
-import java.io.*;
-import java.util.*;
-
 /**
  * @file FilePasswordStorage.java
+ * @package com.ucoruh.password
  * @class FilePasswordStorage
  * @brief Implementation of InterfacePasswordStorage using file-based storage.
  * @author Password Manager Team
@@ -12,6 +8,14 @@ import java.util.*;
  *
  * This class provides file-based operations to store, retrieve, update, and delete password entries.
  * All password data is encrypted using the master password.
+ */
+package com.ucoruh.password;
+
+import java.io.*;
+import java.util.*;
+
+/**
+ * @brief Implementation of InterfacePasswordStorage using file-based storage.
  */
 public class FilePasswordStorage implements InterfacePasswordStorage {
   /**

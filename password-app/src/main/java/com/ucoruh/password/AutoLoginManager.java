@@ -1,5 +1,6 @@
 /**
  * @file AutoLoginManager.java
+ * @package com.ucoruh.password
  * @class AutoLoginManager
  * @brief Manages auto-login functionality for the password manager
  * @author Password Manager Team

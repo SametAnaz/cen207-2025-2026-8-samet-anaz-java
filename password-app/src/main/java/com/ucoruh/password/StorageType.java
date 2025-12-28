@@ -1,7 +1,6 @@
-package com.ucoruh.password;
-
 /**
  * @file StorageType.java
+ * @package com.ucoruh.password
  * @enum StorageType
  * @brief Enum for supported storage types.
  * @author Password Manager Team
@@ -9,6 +8,11 @@ package com.ucoruh.password;
  *
  * This enum defines the types of storage available for password storage,
  * including file-based and SQLite-based implementations.
+ */
+package com.ucoruh.password;
+
+/**
+ * @brief Enum for supported storage types.
  */
 public enum StorageType {
   /**

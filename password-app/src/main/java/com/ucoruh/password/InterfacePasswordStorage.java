@@ -1,10 +1,6 @@
-package com.ucoruh.password;
-
-import java.util.List;
-import java.util.Scanner;
-
 /**
  * @file InterfacePasswordStorage.java
+ * @package com.ucoruh.password
  * @interface InterfacePasswordStorage
  * @brief Interface for password storage operations.
  * @author Password Manager Team
@@ -12,6 +8,14 @@ import java.util.Scanner;
  *
  * This interface defines the operations required for handling password storage,
  * including adding, viewing, updating, deleting, reading, and writing password entries.
+ */
+package com.ucoruh.password;
+
+import java.util.List;
+import java.util.Scanner;
+
+/**
+ * @brief Interface for password storage operations.
  */
 public interface InterfacePasswordStorage {
 

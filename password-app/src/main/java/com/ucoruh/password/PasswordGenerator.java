@@ -1,3 +1,13 @@
+/**
+ * @file PasswordGenerator.java
+ * @package com.ucoruh.password
+ * @class PasswordGenerator
+ * @brief Utility class for generating random passwords.
+ * @author Password Manager Team
+ * @version 1.0
+ * @details This class provides methods to generate secure random passwords using configurable
+ * character sets.
+ */
 package com.ucoruh.password;
 
 import java.util.Random;
@@ -7,13 +17,7 @@ import java.util.Map;
 import java.util.PriorityQueue;
 
 /**
- * @file PasswordGenerator.java
- * @class PasswordGenerator
  * @brief Utility class for generating random passwords.
- * @author Password Manager Team
- * @version 1.0
- * @details This class provides methods to generate secure random passwords using configurable
- * character sets.
  */
 public class PasswordGenerator {
 

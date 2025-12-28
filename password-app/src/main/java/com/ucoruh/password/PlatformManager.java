@@ -1,5 +1,6 @@
 /**
  * @file PlatformManager.java
+ * @package com.ucoruh.password
  * @class PlatformManager
  * @brief Class for Multi-Platform Compatibility management.
  * @author Password Manager Team

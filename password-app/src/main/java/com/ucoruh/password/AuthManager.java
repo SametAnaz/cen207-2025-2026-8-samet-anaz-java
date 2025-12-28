@@ -1,3 +1,14 @@
+/**
+ * @file AuthManager.java
+ * @package com.ucoruh.password
+ * @class AuthManager
+ * @brief Singleton class that manages user authentication.
+ * @author Password Manager Team
+ * @version 1.0
+ *
+ * This class handles the creation and verification of the master password.
+ * It also provides a stub for user-specific functionality.
+ */
 package com.ucoruh.password;
 
 import java.io.BufferedReader;
@@ -9,14 +20,7 @@ import java.io.IOException;
 import java.util.Scanner;
 
 /**
- * @file AuthManager.java
- * @class AuthManager
  * @brief Singleton class that manages user authentication.
- * @author Password Manager Team
- * @version 1.0
- *
- * This class handles the creation and verification of the master password.
- * It also provides a stub for user-specific functionality.
  */
 public class AuthManager {
   /**

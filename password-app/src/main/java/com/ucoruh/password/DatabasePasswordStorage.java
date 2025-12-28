@@ -1,10 +1,6 @@
-package com.ucoruh.password;
-
-import java.sql.*;
-import java.util.*;
-
 /**
  * @file DatabasePasswordStorage.java
+ * @package com.ucoruh.password
  * @class DatabasePasswordStorage
  * @brief SQLite-based implementation of password storage.
  * @author Password Manager Team
@@ -12,6 +8,14 @@ import java.util.*;
  *
  * This class uses an SQLite database to store, retrieve, update, and delete password entries.
  * All sensitive data is encrypted before storing in the database.
+ */
+package com.ucoruh.password;
+
+import java.sql.*;
+import java.util.*;
+
+/**
+ * @brief SQLite-based implementation of password storage.
  */
 public class DatabasePasswordStorage implements InterfacePasswordStorage {
   /**
