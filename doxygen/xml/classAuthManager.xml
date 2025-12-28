@@ -1,0 +1,19 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<doxygen xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="compound.xsd" version="1.9.8" xml:lang="en-US">
+  <compounddef id="classAuthManager" kind="class" language="Java" prot="package">
+    <compoundname>AuthManager</compoundname>
+    <briefdescription>
+<para>Singleton class that manages user authentication. </para>
+    </briefdescription>
+    <detaileddescription>
+<para><simplesect kind="author"><para>Password Manager Team </para>
+</simplesect>
+<simplesect kind="version"><para>1.0</para>
+</simplesect>
+This class handles the creation and verification of the master password. It also provides a stub for user-specific functionality. </para>
+    </detaileddescription>
+    <location file="password-app/src/main/java/com/ucoruh/password/AuthManager.java" line="4" column="1"/>
+    <listofallmembers>
+    </listofallmembers>
+  </compounddef>
+</doxygen>

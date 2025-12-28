@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AutoLoginManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">password-app</a> &gt; <a href="index.source.html" class="el_package">com.ucoruh.password</a> &gt; <span class="el_source">AutoLoginManager.java</span></div><h1>AutoLoginManager.java</h1><pre class="source lang-java linenums">/**
  * @file AutoLoginManager.java
+ * @package com.ucoruh.password
  * @class AutoLoginManager
  * @brief Manages auto-login functionality for the password manager
  * @author Password Manager Team
@@ -17,7 +18,7 @@ import java.util.*;
  * @details This class provides functionality to enable or disable auto-login for specific services
  * and maintains a collection of services for which auto-login is enabled.
  */
-<span class="fc" id="L20">public class AutoLoginManager {</span>
+<span class="fc" id="L21">public class AutoLoginManager {</span>
   /**
    * @brief File path for storing auto-login settings
    */
@@ -26,12 +27,12 @@ import java.util.*;
   /**
    * @brief Set of services with auto-login enabled
    */
-<span class="fc" id="L29">  private static Set&lt;String&gt; autoLoginServices = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L30">  private static Set&lt;String&gt; autoLoginServices = new HashSet&lt;&gt;();</span>
 
   /**
    * @brief Flag indicating if the manager has been initialized
    */
-<span class="fc" id="L34">  private static boolean initialized = false;</span>
+<span class="fc" id="L35">  private static boolean initialized = false;</span>
 
   /**
    * @brief Initializes the AutoLoginManager
@@ -39,20 +40,20 @@ import java.util.*;
    * This method is called internally before any operation.
    */
   private static void initialize() {
-<span class="fc bfc" id="L42" title="All 2 branches covered.">    if (initialized) return;</span>
+<span class="fc bfc" id="L43" title="All 2 branches covered.">    if (initialized) return;</span>
 
-<span class="fc" id="L44">    try (BufferedReader reader = new BufferedReader(new FileReader(AUTO_LOGIN_FILE))) {</span>
+<span class="fc" id="L45">    try (BufferedReader reader = new BufferedReader(new FileReader(AUTO_LOGIN_FILE))) {</span>
       String line;
 
-<span class="fc bfc" id="L47" title="All 2 branches covered.">      while ((line = reader.readLine()) != null) {</span>
-<span class="fc" id="L48">        autoLoginServices.add(line.trim());</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">      while ((line = reader.readLine()) != null) {</span>
+<span class="fc" id="L49">        autoLoginServices.add(line.trim());</span>
       }
-<span class="fc" id="L50">    } catch (IOException e) {</span>
+<span class="fc" id="L51">    } catch (IOException e) {</span>
       // File might not exist yet, that's OK
-<span class="fc" id="L52">    }</span>
+<span class="fc" id="L53">    }</span>
 
-<span class="fc" id="L54">    initialized = true;</span>
-<span class="fc" id="L55">  }</span>
+<span class="fc" id="L55">    initialized = true;</span>
+<span class="fc" id="L56">  }</span>
 
   /**
    * @brief Saves the current auto-login settings
@@ -60,14 +61,14 @@ import java.util.*;
    * Called after any modification to the settings.
    */
   private static void saveSettings() {
-<span class="fc" id="L63">    try (PrintWriter writer = new PrintWriter(new FileWriter(AUTO_LOGIN_FILE))) {</span>
-<span class="fc bfc" id="L64" title="All 2 branches covered.">      for (String service : autoLoginServices) {</span>
-<span class="fc" id="L65">        writer.println(service);</span>
-<span class="fc" id="L66">      }</span>
-<span class="nc" id="L67">    } catch (IOException e) {</span>
-<span class="nc" id="L68">      System.out.println(&quot;Error saving auto-login settings: &quot; + e.getMessage());</span>
-<span class="fc" id="L69">    }</span>
-<span class="fc" id="L70">  }</span>
+<span class="fc" id="L64">    try (PrintWriter writer = new PrintWriter(new FileWriter(AUTO_LOGIN_FILE))) {</span>
+<span class="fc bfc" id="L65" title="All 2 branches covered.">      for (String service : autoLoginServices) {</span>
+<span class="fc" id="L66">        writer.println(service);</span>
+<span class="fc" id="L67">      }</span>
+<span class="nc" id="L68">    } catch (IOException e) {</span>
+<span class="nc" id="L69">      System.out.println(&quot;Error saving auto-login settings: &quot; + e.getMessage());</span>
+<span class="fc" id="L70">    }</span>
+<span class="fc" id="L71">  }</span>
 
   /**
    * @brief Checks if auto-login is enabled for a service
@@ -78,8 +79,8 @@ import java.util.*;
    * @return boolean True if auto-login is enabled, false otherwise
    */
   public static boolean isAutoLoginEnabled(String service) {
-<span class="fc" id="L81">    initialize();</span>
-<span class="fc" id="L82">    return autoLoginServices.contains(service);</span>
+<span class="fc" id="L82">    initialize();</span>
+<span class="fc" id="L83">    return autoLoginServices.contains(service);</span>
   }
 
   /**
@@ -90,10 +91,10 @@ import java.util.*;
    * @param service The service name to enable auto-login for
    */
   public static void enableAutoLogin(String service) {
-<span class="fc" id="L93">    initialize();</span>
-<span class="fc" id="L94">    autoLoginServices.add(service);</span>
-<span class="fc" id="L95">    saveSettings();</span>
-<span class="fc" id="L96">  }</span>
+<span class="fc" id="L94">    initialize();</span>
+<span class="fc" id="L95">    autoLoginServices.add(service);</span>
+<span class="fc" id="L96">    saveSettings();</span>
+<span class="fc" id="L97">  }</span>
 
   /**
    * @brief Disables auto-login for a service
@@ -103,10 +104,10 @@ import java.util.*;
    * @param service The service name to disable auto-login for
    */
   public static void disableAutoLogin(String service) {
-<span class="fc" id="L106">    initialize();</span>
-<span class="fc" id="L107">    autoLoginServices.remove(service);</span>
-<span class="fc" id="L108">    saveSettings();</span>
-<span class="fc" id="L109">  }</span>
+<span class="fc" id="L107">    initialize();</span>
+<span class="fc" id="L108">    autoLoginServices.remove(service);</span>
+<span class="fc" id="L109">    saveSettings();</span>
+<span class="fc" id="L110">  }</span>
 
   /**
    * @brief Performs auto-login for a service
@@ -118,18 +119,18 @@ import java.util.*;
    * @return boolean True if auto-login was successful, false otherwise
    */
   public static boolean autoLogin(String service, PasswordManager passwordManager) {
-<span class="fc bfc" id="L121" title="All 2 branches covered.">    if (isAutoLoginEnabled(service)) {</span>
-<span class="fc" id="L122">      String password = passwordManager.getCredential(service);</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">    if (isAutoLoginEnabled(service)) {</span>
+<span class="fc" id="L123">      String password = passwordManager.getCredential(service);</span>
 
-<span class="fc bfc" id="L124" title="All 2 branches covered.">      if (password != null) {</span>
-<span class="fc" id="L125">        System.out.println(&quot;Auto-logging in to &quot; + service + &quot;...&quot;);</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">      if (password != null) {</span>
+<span class="fc" id="L126">        System.out.println(&quot;Auto-logging in to &quot; + service + &quot;...&quot;);</span>
         // Simulate login
-<span class="fc" id="L127">        System.out.println(&quot;Successfully logged in to &quot; + service);</span>
-<span class="fc" id="L128">        return true;</span>
+<span class="fc" id="L128">        System.out.println(&quot;Successfully logged in to &quot; + service);</span>
+<span class="fc" id="L129">        return true;</span>
       }
     }
 
-<span class="fc" id="L132">    return false;</span>
+<span class="fc" id="L133">    return false;</span>
   }
 
   /**
@@ -141,52 +142,52 @@ import java.util.*;
    * @param passwordManager The PasswordManager instance to use for credentials
    */
   public static void menu(Scanner scanner, PasswordManager passwordManager) {
-<span class="fc" id="L144">    initialize();</span>
-<span class="fc" id="L145">    boolean back = false;</span>
+<span class="fc" id="L145">    initialize();</span>
+<span class="fc" id="L146">    boolean back = false;</span>
 
-<span class="fc bfc" id="L147" title="All 2 branches covered.">    while (!back) {</span>
-<span class="fc" id="L148">      System.out.println(&quot;\n==== AUTO-LOGIN FEATURES ====&quot;);</span>
-<span class="fc" id="L149">      System.out.println(&quot;1. Enable Auto-Login for a service&quot;);</span>
-<span class="fc" id="L150">      System.out.println(&quot;2. Disable Auto-Login for a service&quot;);</span>
-<span class="fc" id="L151">      System.out.println(&quot;3. Show services with Auto-Login enabled&quot;);</span>
-<span class="fc" id="L152">      System.out.println(&quot;4. Simulate Auto-Login for a service&quot;);</span>
-<span class="fc" id="L153">      System.out.println(&quot;0. Back to Main Menu&quot;);</span>
-<span class="fc" id="L154">      System.out.print(&quot;Your choice: &quot;);</span>
-<span class="fc" id="L155">      String input = scanner.nextLine();</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">    while (!back) {</span>
+<span class="fc" id="L149">      System.out.println(&quot;\n==== AUTO-LOGIN FEATURES ====&quot;);</span>
+<span class="fc" id="L150">      System.out.println(&quot;1. Enable Auto-Login for a service&quot;);</span>
+<span class="fc" id="L151">      System.out.println(&quot;2. Disable Auto-Login for a service&quot;);</span>
+<span class="fc" id="L152">      System.out.println(&quot;3. Show services with Auto-Login enabled&quot;);</span>
+<span class="fc" id="L153">      System.out.println(&quot;4. Simulate Auto-Login for a service&quot;);</span>
+<span class="fc" id="L154">      System.out.println(&quot;0. Back to Main Menu&quot;);</span>
+<span class="fc" id="L155">      System.out.print(&quot;Your choice: &quot;);</span>
+<span class="fc" id="L156">      String input = scanner.nextLine();</span>
 
       try {
-<span class="fc" id="L158">        int choice = Integer.parseInt(input);</span>
+<span class="fc" id="L159">        int choice = Integer.parseInt(input);</span>
 
-<span class="fc bfc" id="L160" title="All 6 branches covered.">        switch (choice) {</span>
+<span class="fc bfc" id="L161" title="All 6 branches covered.">        switch (choice) {</span>
           case 1:
-<span class="fc" id="L162">            enableAutoLoginMenu(scanner, passwordManager);</span>
-<span class="fc" id="L163">            break;</span>
+<span class="fc" id="L163">            enableAutoLoginMenu(scanner, passwordManager);</span>
+<span class="fc" id="L164">            break;</span>
 
           case 2:
-<span class="fc" id="L166">            disableAutoLoginMenu(scanner);</span>
-<span class="fc" id="L167">            break;</span>
+<span class="fc" id="L167">            disableAutoLoginMenu(scanner);</span>
+<span class="fc" id="L168">            break;</span>
 
           case 3:
-<span class="fc" id="L170">            showAutoLoginServices();</span>
-<span class="fc" id="L171">            break;</span>
+<span class="fc" id="L171">            showAutoLoginServices();</span>
+<span class="fc" id="L172">            break;</span>
 
           case 4:
-<span class="fc" id="L174">            simulateAutoLogin(scanner, passwordManager);</span>
-<span class="fc" id="L175">            break;</span>
+<span class="fc" id="L175">            simulateAutoLogin(scanner, passwordManager);</span>
+<span class="fc" id="L176">            break;</span>
 
           case 0:
-<span class="fc" id="L178">            back = true;</span>
-<span class="fc" id="L179">            break;</span>
+<span class="fc" id="L179">            back = true;</span>
+<span class="fc" id="L180">            break;</span>
 
           default:
-<span class="fc" id="L182">            System.out.println(&quot;Invalid choice.&quot;);</span>
+<span class="fc" id="L183">            System.out.println(&quot;Invalid choice.&quot;);</span>
             break;
         }
-<span class="fc" id="L185">      } catch (NumberFormatException e) {</span>
-<span class="fc" id="L186">        System.out.println(&quot;Invalid number.&quot;);</span>
-<span class="fc" id="L187">      }</span>
-<span class="fc" id="L188">    }</span>
-<span class="fc" id="L189">  }</span>
+<span class="fc" id="L186">      } catch (NumberFormatException e) {</span>
+<span class="fc" id="L187">        System.out.println(&quot;Invalid number.&quot;);</span>
+<span class="fc" id="L188">      }</span>
+<span class="fc" id="L189">    }</span>
+<span class="fc" id="L190">  }</span>
 
   /**
    * @brief Handles the enable auto-login menu option
@@ -197,17 +198,17 @@ import java.util.*;
    * @param passwordManager The PasswordManager instance to verify service existence
    */
   private static void enableAutoLoginMenu(Scanner scanner, PasswordManager passwordManager) {
-<span class="fc" id="L200">    System.out.print(&quot;Enter service name to enable auto-login: &quot;);</span>
-<span class="fc" id="L201">    String service = scanner.nextLine();</span>
+<span class="fc" id="L201">    System.out.print(&quot;Enter service name to enable auto-login: &quot;);</span>
+<span class="fc" id="L202">    String service = scanner.nextLine();</span>
 
     // Check if the service exists in the password manager
-<span class="fc bfc" id="L204" title="All 2 branches covered.">    if (passwordManager.getCredential(service) != null) {</span>
-<span class="fc" id="L205">      enableAutoLogin(service);</span>
-<span class="fc" id="L206">      System.out.println(&quot;Auto-login enabled for &quot; + service);</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">    if (passwordManager.getCredential(service) != null) {</span>
+<span class="fc" id="L206">      enableAutoLogin(service);</span>
+<span class="fc" id="L207">      System.out.println(&quot;Auto-login enabled for &quot; + service);</span>
     } else {
-<span class="fc" id="L208">      System.out.println(&quot;Service not found. Please add this service to your passwords first.&quot;);</span>
+<span class="fc" id="L209">      System.out.println(&quot;Service not found. Please add this service to your passwords first.&quot;);</span>
     }
-<span class="fc" id="L210">  }</span>
+<span class="fc" id="L211">  }</span>
 
   /**
    * @brief Handles the disable auto-login menu option
@@ -217,16 +218,16 @@ import java.util.*;
    * @param scanner Scanner object for reading user input
    */
   private static void disableAutoLoginMenu(Scanner scanner) {
-<span class="fc" id="L220">    System.out.print(&quot;Enter service name to disable auto-login: &quot;);</span>
-<span class="fc" id="L221">    String service = scanner.nextLine();</span>
+<span class="fc" id="L221">    System.out.print(&quot;Enter service name to disable auto-login: &quot;);</span>
+<span class="fc" id="L222">    String service = scanner.nextLine();</span>
 
-<span class="fc bfc" id="L223" title="All 2 branches covered.">    if (isAutoLoginEnabled(service)) {</span>
-<span class="fc" id="L224">      disableAutoLogin(service);</span>
-<span class="fc" id="L225">      System.out.println(&quot;Auto-login disabled for &quot; + service);</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">    if (isAutoLoginEnabled(service)) {</span>
+<span class="fc" id="L225">      disableAutoLogin(service);</span>
+<span class="fc" id="L226">      System.out.println(&quot;Auto-login disabled for &quot; + service);</span>
     } else {
-<span class="fc" id="L227">      System.out.println(&quot;Auto-login was not enabled for &quot; + service);</span>
+<span class="fc" id="L228">      System.out.println(&quot;Auto-login was not enabled for &quot; + service);</span>
     }
-<span class="fc" id="L229">  }</span>
+<span class="fc" id="L230">  }</span>
 
   /**
    * @brief Shows all services with auto-login enabled
@@ -234,17 +235,17 @@ import java.util.*;
    * auto-login enabled.
    */
   private static void showAutoLoginServices() {
-<span class="fc" id="L237">    initialize();</span>
-<span class="fc" id="L238">    System.out.println(&quot;\nServices with Auto-Login enabled:&quot;);</span>
+<span class="fc" id="L238">    initialize();</span>
+<span class="fc" id="L239">    System.out.println(&quot;\nServices with Auto-Login enabled:&quot;);</span>
 
-<span class="fc bfc" id="L240" title="All 2 branches covered.">    if (autoLoginServices.isEmpty()) {</span>
-<span class="fc" id="L241">      System.out.println(&quot;None&quot;);</span>
+<span class="fc bfc" id="L241" title="All 2 branches covered.">    if (autoLoginServices.isEmpty()) {</span>
+<span class="fc" id="L242">      System.out.println(&quot;None&quot;);</span>
     } else {
-<span class="fc bfc" id="L243" title="All 2 branches covered.">      for (String service : autoLoginServices) {</span>
-<span class="fc" id="L244">        System.out.println(&quot;- &quot; + service);</span>
-<span class="fc" id="L245">      }</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">      for (String service : autoLoginServices) {</span>
+<span class="fc" id="L245">        System.out.println(&quot;- &quot; + service);</span>
+<span class="fc" id="L246">      }</span>
     }
-<span class="fc" id="L247">  }</span>
+<span class="fc" id="L248">  }</span>
 
   /**
    * @brief Simulates auto-login for a specified service
@@ -255,12 +256,12 @@ import java.util.*;
    * @param passwordManager The PasswordManager instance to use for credentials
    */
   private static void simulateAutoLogin(Scanner scanner, PasswordManager passwordManager) {
-<span class="fc" id="L258">    System.out.print(&quot;Enter service name to auto-login: &quot;);</span>
-<span class="fc" id="L259">    String service = scanner.nextLine();</span>
+<span class="fc" id="L259">    System.out.print(&quot;Enter service name to auto-login: &quot;);</span>
+<span class="fc" id="L260">    String service = scanner.nextLine();</span>
 
-<span class="fc bfc" id="L261" title="All 2 branches covered.">    if (!autoLogin(service, passwordManager)) {</span>
-<span class="fc" id="L262">      System.out.println(&quot;Auto-login failed for &quot; + service);</span>
+<span class="fc bfc" id="L262" title="All 2 branches covered.">    if (!autoLogin(service, passwordManager)) {</span>
+<span class="fc" id="L263">      System.out.println(&quot;Auto-login failed for &quot; + service);</span>
     }
-<span class="fc" id="L264">  }</span>
+<span class="fc" id="L265">  }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.8.202204050719</span></div></body></html>
